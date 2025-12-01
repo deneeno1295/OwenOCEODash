@@ -1,0 +1,105 @@
+Role: You are a Senior Full-Stack Architect and UI/UX Designer specializing in Enterprise Dashboards.
+
+Goal: Build the "OCEO Dashboard," a Competitive Intelligence & Executive Dashboard.
+
+Aesthetic & Branding: The design must mimic a Salesforce.com internal asset (Lightning Design System style).
+
+Theme: "Cosmic" Dark Mode (Enterprise Dark).
+
+Palette: Salesforce Blues (#0176D3 for primary actions), deeply dark slate backgrounds (not pure black), and high-contrast white text.
+
+Components: Use card-based layouts with clean headers, utility bars, and compact data tables. Use "skeuomorphic" depth where appropriate to match enterprise standards.
+
+Font: System sans-serif (clean, legible, professional).
+
+Tech Stack (Strict Enforcement):
+
+Frontend: React 19 + Vite (TypeScript).
+
+Styling: TailwindCSS + clsx + tailwind-merge.
+
+Icons: lucide-react.
+
+Charts: recharts (for analytics curves).
+
+Diagrams: mermaid or react-mermaid2 (for rendering Gemini architectural code).
+
+Backend: Python FastAPI (Create the folder structure and main.py, but mock the data for the UI first).
+
+Core Features & View Requirements:
+
+Global Layout:
+
+A collapsible left sidebar navigation (Icons + Labels).
+
+A top "Global Header" containing the user profile, search bar, and system health status.
+
+Dashboard (Home View):
+
+KPI Cards: Display "Sentiment Score" (Gauge), "Active Priorities" (Number), "New Startups" (Badge).
+
+Velocity Tracker: A Recharts line chart tracking "Sentiment Velocity" over 7 days.
+
+Alerts Feed: A list of "Critical Signals" (e.g., >30% sentiment drop).
+
+Sentiment & Market Analysis View:
+
+A two-column layout.
+
+Left: List of competitors (HubSpot, Salesforce, etc.).
+
+Right: Detail view showing xAI Grok analysis (Sentiment Score, Velocity, Hot Topics).
+
+Action: A "Refresh Intelligence" button that simulates triggering Perplexity.
+
+Cloud Intelligence View (The "Gemini" Module):
+
+A visual canvas that renders Mermaid.js diagrams.
+
+Show a dropdown to select one of the 12 Salesforce Clouds (Sales, Service, Marketing, etc.).
+
+Display "Strategic Gaps" and "Ecosystem Shifts" in a side panel next to the diagram.
+
+Adaptive Analysis (LangChain Monitor):
+
+A live log view showing the "Agent Reasoning."
+
+Visual indicator of the strategy being used: "Deep Analysis" (Small Co) vs "Strategic Analysis" (Large Ent).
+
+Strategic Priorities & Startups:
+
+Priorities: A Kanban-style board or Ranked List for internal initiatives.
+
+Startups: A Data Table with columns: Name, Stage, Hiring Velocity, Hot Score. Include a button for "Deep Research" (OpenAI trigger).
+
+Implementation Steps:
+
+Set up the Vite + React + Tailwind project.
+
+Create the Layout component with the Salesforce-style sidebar and header.
+
+Create the Dashboard, Sentiment, CloudIntelligence, and Startup pages.
+
+Use dummy JSON data to populate the charts and tables so the UI is fully interactive immediately.
+
+Important: Ensure the UI looks dense and data-rich (Executive Dashboard style), not sparse.
+
+Tips for Refining the Result
+Once Replit generates the initial build, you may want to refine specific areas. Here are follow-up prompts you can use:
+
+For the Charts:
+
+
+Getty Images
+"Update the Recharts on the Dashboard to look more like a financial terminal. Use gradients under the lines (AreaChart) and remove the grid lines for a cleaner look."
+
+For the Cloud Diagrams: "In the CloudIntelligence component, integrate mermaid so that when I switch between 'Sales Cloud' and 'Service Cloud', it renders a different complex architectural diagram representing that ecosystem."
+
+For the "Salesforce" Look: "Refine the buttons and cards. Buttons should have no border-radius (or very slight), and cards should have a subtle top border highlight in blue (border-t-4 border-blue-600) to match standard enterprise dashboard patterns."
+
+Why this prompt works
+Explicit "Cosmic" Theme: Salesforce creates "Cosmic" themes for their analytics products (Einstein Analytics); asking for this ensures you get a dark mode that looks professional, not just a generic "dark theme."
+
+Component Mapping: It translates your backend logic (Grok/Perplexity) into specific UI elements (Gauges/Feeds) so the designer knows how to visualize the AI.
+
+Mock Data Strategy: By asking Replit to "mock the data," you get a clickable, beautiful UI immediately without needing the API keys for xAI or Perplexity set up yet.

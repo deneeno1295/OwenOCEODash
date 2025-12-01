@@ -1,0 +1,140 @@
+{
+  "colorScheme": "light",
+  "fonts": [
+    {
+      "family": "Salesforce Sans",
+      "role": "body"
+    },
+    {
+      "family": "Arial",
+      "role": "body"
+    },
+    {
+      "family": "Helvetica Neue",
+      "role": "body"
+    },
+    {
+      "family": "Segoe UI",
+      "role": "body"
+    },
+    {
+      "family": "Noto Sans",
+      "role": "body"
+    }
+  ],
+  "colors": {
+    "primary": "#0176D3",
+    "accent": "#0176D3",
+    "background": "#FFFFFF",
+    "textPrimary": "#080707",
+    "link": "#032D60"
+  },
+  "typography": {
+    "fontFamilies": {
+      "primary": "Salesforce Sans",
+      "heading": "Salesforce Sans"
+    },
+    "fontStacks": {
+      "heading": [
+        "Salesforce Sans",
+        "system-ui",
+        "-apple-system",
+        "blinkmacsystemfont",
+        "Segoe UI",
+        "roboto",
+        "Helvetica Neue",
+        "Arial",
+        "Noto Sans",
+        "sans-serif",
+        "Apple Color Emoji",
+        "Noto Color Emoji"
+      ],
+      "body": [
+        "Salesforce Sans",
+        "Arial",
+        "sans-serif"
+      ],
+      "paragraph": [
+        "ITC Avant Garde",
+        "system-ui",
+        "-apple-system",
+        "blinkmacsystemfont",
+        "Segoe UI",
+        "roboto",
+        "Helvetica Neue",
+        "Arial",
+        "Noto Sans",
+        "sans-serif",
+        "Apple Color Emoji",
+        "Noto Color Emoji"
+      ]
+    },
+    "fontSizes": {
+      "h1": "22px",
+      "h2": "80px",
+      "body": "16px"
+    }
+  },
+  "spacing": {
+    "baseUnit": 4,
+    "borderRadius": "5px"
+  },
+  "components": {
+    "input": {
+      "borderColor": "#CCCCCC",
+      "borderRadius": "5px"
+    },
+    "buttonPrimary": {
+      "background": "#0176D3",
+      "textColor": "#FFFFFF",
+      "borderColor": "#0176D3",
+      "borderRadius": "4px",
+      "shadow": "none"
+    },
+    "buttonSecondary": {
+      "background": "#FFFFFF",
+      "textColor": "#0176D3",
+      "borderColor": "#0176D3",
+      "borderRadius": "4px",
+      "shadow": "none"
+    }
+  },
+  "images": {
+    "logo": "File saved at: attached_assets/logo.svg",
+    "favicon": "File saved at: attached_assets/favicon.ico",
+    "ogImage": "https://wp.sfdcdigital.com/en-us/wp-content/uploads/sites/4/2022/11/salesforce-logo.jpg?w=1024"
+  },
+  "__framework_hints": [],
+  "__llm_logo_reasoning": {
+    "selectedIndex": 0,
+    "reasoning": "Logo #0 visually represents the brand name 'Salesforce' and is located in the header, making it the main brand logo.",
+    "confidence": 0.98
+  },
+  "__llm_button_reasoning": {
+    "primary": {
+      "index": 1,
+      "text": "Try for free",
+      "reasoning": "Button #1 ('Try for free') has a vibrant blue background (#0176D3) and action-oriented text, making it the primary call-to-action."
+    },
+    "secondary": {
+      "index": 2,
+      "text": "Start demo",
+      "reasoning": "Button #2 ('Start demo') has a white background (#FFFFFF), which is different from the primary button's vibrant color, making it a suitable secondary option."
+    },
+    "confidence": 0.95
+  },
+  "personality": {
+    "tone": "professional",
+    "energy": "medium",
+    "targetAudience": "business professionals and organizations looking for CRM solutions."
+  },
+  "designSystem": {
+    "framework": "unknown",
+    "componentLibrary": null
+  },
+  "confidence": {
+    "buttons": 0.95,
+    "colors": 0.9,
+    "overall": 0.925
+  }
+}

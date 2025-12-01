@@ -1,0 +1,711 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  ArrowLeft, 
+  Building2, 
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  ExternalLink,
+  Calendar,
+  DollarSign,
+  BarChart3,
+  FileText,
+  MessageSquare,
+  Newspaper,
+  Phone,
+  Twitter,
+  ThumbsUp,
+  ThumbsDown,
+  Sparkles
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
+
+interface Competitor {
+  id: number;
+  name: string;
+  type: string;
+  score: number;
+  trend: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface EarningsReport {
+  id: number;
+  companyName: string;
+  quarter: string;
+  fiscalYear: string;
+  revenue: string | null;
+  revenueExpected: string | null;
+  revenueBeatMiss: string | null;
+  revenueChange: string | null;
+  eps: string | null;
+  epsExpected: string | null;
+  epsBeatMiss: string | null;
+  epsChange: string | null;
+  beatMiss: string | null;
+  beatMissDetails: string | null;
+  guidance: string | null;
+  guidanceVsExpectations: string | null;
+  guidanceNotes: string | null;
+  nextQuarterRevenue: string | null;
+  nextQuarterEps: string | null;
+  fullYearRevenue: string | null;
+  fullYearEps: string | null;
+  stockReaction: string | null;
+  stockReactionTime: string | null;
+  analystReaction: string | null;
+  priceTargetChanges: string | null;
+  transcriptUrl: string | null;
+  pressReleaseUrl: string | null;
+  createdAt: string;
+}
+
+interface SentimentAnalysis {
+  id: number;
+  competitorId: number;
+  summary: string;
+  topics: any;
+  sources: any;
+  aiConfidence: number;
+  createdAt: string;
+}
+
+interface CompetitorContent {
+  id: number;
+  competitorId: number;
+  contentType: string;
+  title: string;
+  source: string | null;
+  summary: string | null;
+  content: string | null;
+  url: string | null;
+  sentiment: string | null;
+  engagementCount: number;
+  publishedAt: string | null;
+  createdAt: string;
+}
+
+interface CompetitorDetailProps {
+  id: string;
+}
+
+export default function CompetitorDetail({ id }: CompetitorDetailProps) {
+  const { data: competitor, isLoading, error } = useQuery<Competitor>({
+    queryKey: ["competitor", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/competitors/${id}`);
+      if (!res.ok) throw new Error("Failed to fetch competitor");
+      return res.json();
+    },
+  });
+
+  const { data: earnings = [] } = useQuery<EarningsReport[]>({
+    queryKey: ["earnings", competitor?.name],
+    queryFn: async () => {
+      if (!competitor?.name) return [];
+      const res = await fetch(`/api/earnings?company=${encodeURIComponent(competitor.name)}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!competitor?.name,
+  });
+
+  const { data: sentiment } = useQuery<SentimentAnalysis>({
+    queryKey: ["sentiment", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/sentiment/${id}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
+  const { data: allContent = [] } = useQuery<CompetitorContent[]>({
+    queryKey: ["competitor-content", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/competitors/${id}/content`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const analystReports = allContent.filter(c => c.contentType === "analyst_report");
+  const transcripts = allContent.filter(c => c.contentType === "transcript");
+  const articles = allContent.filter(c => c.contentType === "article");
+  const xReactions = allContent.filter(c => c.contentType === "x_reaction");
+  const callLinks = allContent.filter(c => c.contentType === "call_link");
+
+  const latestEarnings = earnings[0];
+
+  const getTrendIcon = (trend: string) => {
+    switch (trend) {
+      case "up":
+        return <TrendingUp className="h-4 w-4 text-green-600" />;
+      case "down":
+        return <TrendingDown className="h-4 w-4 text-red-600" />;
+      default:
+        return <Minus className="h-4 w-4 text-gray-400" />;
+    }
+  };
+
+  const getSentimentColor = (sentiment: string | null) => {
+    switch (sentiment) {
+      case "positive":
+        return "bg-green-100 text-green-700 border-green-200";
+      case "negative":
+        return "bg-red-100 text-red-700 border-red-200";
+      default:
+        return "bg-gray-100 text-gray-700 border-gray-200";
+    }
+  };
+
+  const getBeatMissColor = (beatMiss: string | null) => {
+    if (!beatMiss) return "bg-gray-100 text-gray-700";
+    if (beatMiss === "beat") return "bg-green-100 text-green-700";
+    if (beatMiss === "miss") return "bg-red-100 text-red-700";
+    return "bg-yellow-100 text-yellow-700";
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-muted-foreground">Loading competitor details...</div>
+      </div>
+    );
+  }
+
+  if (error || !competitor) {
+    return (
+      <div className="space-y-6">
+        <Link href="/">
+          <Button variant="ghost" className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+        </Link>
+        <Card className="bg-white">
+          <CardContent className="p-8 text-center">
+            <Building2 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+            <p className="text-muted-foreground">Competitor not found</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="flex items-center justify-between">
+        <Link href="/">
+          <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-[#0176D3]" data-testid="button-back-to-dashboard">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+        </Link>
+      </div>
+
+      <Card className="bg-white border-t-4 border-[#0176D3] shadow-sm">
+        <CardContent className="p-6">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-4">
+              <div className="h-16 w-16 rounded-lg bg-gradient-to-br from-[#0176D3] to-purple-600 flex items-center justify-center">
+                <Building2 className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-[#080707]" data-testid="text-competitor-name">{competitor.name}</h1>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="outline" className="border-gray-200">{competitor.type}</Badge>
+                  <div className="flex items-center gap-1">
+                    {getTrendIcon(competitor.trend)}
+                    <span className="text-sm text-muted-foreground capitalize">{competitor.trend}</span>
+                  </div>
+                  {latestEarnings?.beatMiss && (
+                    <Badge className={cn("border-0", getBeatMissColor(latestEarnings.beatMiss))}>
+                      {latestEarnings.beatMiss === "beat" ? "Beat Estimates" : 
+                       latestEarnings.beatMiss === "miss" ? "Missed Estimates" : "Inline"}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm text-muted-foreground mb-1">Threat Score</div>
+              <div className="text-4xl font-light text-[#0176D3]">{competitor.score}</div>
+              <div className="h-2 w-24 bg-gray-200 rounded-full overflow-hidden mt-2">
+                <div 
+                  className="h-full bg-gradient-to-r from-[#0176D3] to-purple-600" 
+                  style={{ width: `${competitor.score}%` }} 
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Tabs defaultValue="earnings" className="space-y-4">
+        <TabsList className="bg-white border border-gray-200 p-1 flex-wrap">
+          <TabsTrigger value="earnings" className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white gap-2" data-testid="tab-earnings">
+            <DollarSign className="h-4 w-4" />
+            Earnings
+          </TabsTrigger>
+          <TabsTrigger value="analysts" className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white gap-2" data-testid="tab-analysts">
+            <BarChart3 className="h-4 w-4" />
+            Analyst Reports ({analystReports.length})
+          </TabsTrigger>
+          <TabsTrigger value="transcripts" className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white gap-2" data-testid="tab-transcripts">
+            <FileText className="h-4 w-4" />
+            Transcripts ({transcripts.length})
+          </TabsTrigger>
+          <TabsTrigger value="reactions" className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white gap-2" data-testid="tab-reactions">
+            <Twitter className="h-4 w-4" />
+            X Reactions ({xReactions.length})
+          </TabsTrigger>
+          <TabsTrigger value="articles" className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white gap-2" data-testid="tab-articles">
+            <Newspaper className="h-4 w-4" />
+            Articles ({articles.length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="earnings">
+          {latestEarnings ? (
+            <div className="grid gap-6 md:grid-cols-3">
+              <div className="md:col-span-2 space-y-6">
+                <Card className="bg-white shadow-sm">
+                  <CardHeader className="border-b border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base font-semibold text-[#080707]">
+                        {latestEarnings.quarter} {latestEarnings.fiscalYear} Results
+                      </CardTitle>
+                      <Badge className={cn("border-0", getBeatMissColor(latestEarnings.beatMiss))}>
+                        {latestEarnings.beatMissDetails || (latestEarnings.beatMiss === "beat" ? "Beat Estimates" : "Missed Estimates")}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <h4 className="text-sm font-medium text-[#080707]">Revenue</h4>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-3xl font-light text-[#080707]">{latestEarnings.revenue || "N/A"}</span>
+                          {latestEarnings.revenueBeatMiss && (
+                            <Badge className={cn("text-xs", 
+                              latestEarnings.revenueBeatMiss.startsWith("+") ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                            )}>
+                              {latestEarnings.revenueBeatMiss}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Expected: {latestEarnings.revenueExpected || "N/A"}
+                        </div>
+                        {latestEarnings.revenueChange && (
+                          <div className="text-sm text-muted-foreground">
+                            YoY Change: <span className={latestEarnings.revenueChange.startsWith("+") ? "text-green-600" : "text-red-600"}>
+                              {latestEarnings.revenueChange}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <h4 className="text-sm font-medium text-[#080707]">EPS</h4>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-3xl font-light text-[#080707]">{latestEarnings.eps || "N/A"}</span>
+                          {latestEarnings.epsBeatMiss && (
+                            <Badge className={cn("text-xs", 
+                              latestEarnings.epsBeatMiss.startsWith("+") ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                            )}>
+                              {latestEarnings.epsBeatMiss}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Expected: {latestEarnings.epsExpected || "N/A"}
+                        </div>
+                        {latestEarnings.epsChange && (
+                          <div className="text-sm text-muted-foreground">
+                            YoY Change: <span className={latestEarnings.epsChange.startsWith("+") ? "text-green-600" : "text-red-600"}>
+                              {latestEarnings.epsChange}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white shadow-sm">
+                  <CardHeader className="border-b border-gray-100">
+                    <CardTitle className="text-base font-semibold text-[#080707]">Guidance</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Badge className={cn("border-0",
+                        latestEarnings.guidance === "raised" ? "bg-green-100 text-green-700" :
+                        latestEarnings.guidance === "lowered" ? "bg-red-100 text-red-700" :
+                        "bg-yellow-100 text-yellow-700"
+                      )}>
+                        {latestEarnings.guidance ? `Guidance ${latestEarnings.guidance}` : "Guidance Maintained"}
+                      </Badge>
+                      {latestEarnings.guidanceVsExpectations && (
+                        <span className="text-sm text-muted-foreground">
+                          vs. Expectations: <span className="capitalize">{latestEarnings.guidanceVsExpectations}</span>
+                        </span>
+                      )}
+                    </div>
+                    {latestEarnings.guidanceNotes && (
+                      <p className="text-sm text-muted-foreground mb-4">{latestEarnings.guidanceNotes}</p>
+                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-muted-foreground mb-1">Next Quarter Revenue</div>
+                        <div className="font-medium">{latestEarnings.nextQuarterRevenue || "Not provided"}</div>
+                      </div>
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-muted-foreground mb-1">Next Quarter EPS</div>
+                        <div className="font-medium">{latestEarnings.nextQuarterEps || "Not provided"}</div>
+                      </div>
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-muted-foreground mb-1">Full Year Revenue</div>
+                        <div className="font-medium">{latestEarnings.fullYearRevenue || "Not provided"}</div>
+                      </div>
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-muted-foreground mb-1">Full Year EPS</div>
+                        <div className="font-medium">{latestEarnings.fullYearEps || "Not provided"}</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="space-y-6">
+                <Card className="bg-white shadow-sm">
+                  <CardHeader className="border-b border-gray-100">
+                    <CardTitle className="text-base font-semibold text-[#080707]">Market Reaction</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-4 space-y-4">
+                    {latestEarnings.stockReaction && (
+                      <div className="flex items-center gap-3">
+                        {latestEarnings.stockReaction.startsWith("+") ? (
+                          <TrendingUp className="h-6 w-6 text-green-600" />
+                        ) : (
+                          <TrendingDown className="h-6 w-6 text-red-600" />
+                        )}
+                        <div>
+                          <div className={cn("text-2xl font-light",
+                            latestEarnings.stockReaction.startsWith("+") ? "text-green-600" : "text-red-600"
+                          )}>
+                            {latestEarnings.stockReaction}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {latestEarnings.stockReactionTime || "Post-earnings"}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <Separator />
+                    <div>
+                      <div className="text-sm font-medium text-[#080707] mb-1">Analyst Reaction</div>
+                      <div className="text-sm text-muted-foreground capitalize">
+                        {latestEarnings.analystReaction || "Awaiting analysis"}
+                      </div>
+                    </div>
+                    {latestEarnings.priceTargetChanges && (
+                      <div>
+                        <div className="text-sm font-medium text-[#080707] mb-1">Price Target Changes</div>
+                        <div className="text-sm text-muted-foreground">
+                          {latestEarnings.priceTargetChanges}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white shadow-sm">
+                  <CardHeader className="border-b border-gray-100">
+                    <CardTitle className="text-base font-semibold text-[#080707]">Quick Links</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-4 space-y-2">
+                    {latestEarnings.transcriptUrl && (
+                      <a 
+                        href={latestEarnings.transcriptUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm text-[#0176D3] hover:underline"
+                      >
+                        <FileText className="h-4 w-4" />
+                        Earnings Call Transcript
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                    {latestEarnings.pressReleaseUrl && (
+                      <a 
+                        href={latestEarnings.pressReleaseUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm text-[#0176D3] hover:underline"
+                      >
+                        <Newspaper className="h-4 w-4" />
+                        Press Release
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                    {callLinks.map((link) => (
+                      <a 
+                        key={link.id}
+                        href={link.url || "#"} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm text-[#0176D3] hover:underline"
+                      >
+                        <Phone className="h-4 w-4" />
+                        {link.title}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                {sentiment && (
+                  <Card className="bg-white shadow-sm border-t-4 border-purple-500">
+                    <CardHeader className="border-b border-gray-100">
+                      <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#080707]">
+                        <Sparkles className="h-4 w-4 text-purple-500" />
+                        AI Sentiment Analysis
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                      <p className="text-sm text-muted-foreground mb-3">{sentiment.summary}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">AI Confidence:</span>
+                        <div className="flex-1 h-1.5 bg-gray-200 rounded-full">
+                          <div 
+                            className="h-full bg-purple-500 rounded-full" 
+                            style={{ width: `${sentiment.aiConfidence}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-medium">{sentiment.aiConfidence}%</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
+          ) : (
+            <Card className="bg-white shadow-sm">
+              <CardContent className="p-8 text-center">
+                <DollarSign className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <p className="text-muted-foreground">No earnings data available for {competitor.name}</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="analysts">
+          <Card className="bg-white shadow-sm">
+            <CardHeader className="border-b border-gray-100">
+              <CardTitle className="text-base font-semibold text-[#080707]">Analyst Reports</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {analystReports.length === 0 ? (
+                <div className="p-8 text-center">
+                  <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-muted-foreground">No analyst reports available yet</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {analystReports.map((report) => (
+                    <div key={report.id} className="p-4 hover:bg-gray-50 transition-colors" data-testid={`analyst-report-${report.id}`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-medium text-[#080707]">{report.title}</h4>
+                            {report.sentiment && (
+                              <Badge variant="outline" className={cn("text-xs", getSentimentColor(report.sentiment))}>
+                                {report.sentiment}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground mb-2">
+                            {report.source} • {report.publishedAt ? new Date(report.publishedAt).toLocaleDateString() : "Recent"}
+                          </div>
+                          {report.summary && (
+                            <p className="text-sm text-muted-foreground line-clamp-2">{report.summary}</p>
+                          )}
+                        </div>
+                        {report.url && (
+                          <a href={report.url} target="_blank" rel="noopener noreferrer">
+                            <Button variant="ghost" size="sm" className="text-[#0176D3]">
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="transcripts">
+          <Card className="bg-white shadow-sm">
+            <CardHeader className="border-b border-gray-100">
+              <CardTitle className="text-base font-semibold text-[#080707]">Earnings Call Transcripts</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {transcripts.length === 0 ? (
+                <div className="p-8 text-center">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-muted-foreground">No transcripts available yet</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {transcripts.map((transcript) => (
+                    <div key={transcript.id} className="p-4 hover:bg-gray-50 transition-colors" data-testid={`transcript-${transcript.id}`}>
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h4 className="font-medium text-[#080707]">{transcript.title}</h4>
+                          <div className="text-sm text-muted-foreground">
+                            {transcript.publishedAt ? new Date(transcript.publishedAt).toLocaleDateString() : "Recent"}
+                          </div>
+                        </div>
+                        {transcript.url && (
+                          <a href={transcript.url} target="_blank" rel="noopener noreferrer">
+                            <Button variant="outline" size="sm" className="gap-2">
+                              <ExternalLink className="h-4 w-4" />
+                              Full Transcript
+                            </Button>
+                          </a>
+                        )}
+                      </div>
+                      {transcript.content && (
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-6">
+                            {transcript.content}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reactions">
+          <Card className="bg-white shadow-sm">
+            <CardHeader className="border-b border-gray-100">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold text-[#080707]">
+                <Twitter className="h-5 w-5" />
+                X (Twitter) Reactions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {xReactions.length === 0 ? (
+                <div className="p-8 text-center">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-muted-foreground">No X reactions captured yet</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {xReactions.map((reaction) => (
+                    <div key={reaction.id} className="p-4 hover:bg-gray-50 transition-colors" data-testid={`x-reaction-${reaction.id}`}>
+                      <div className="flex items-start gap-3">
+                        <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                          <Twitter className="h-5 w-5 text-gray-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-[#080707]">{reaction.source || "@user"}</span>
+                            {reaction.sentiment && (
+                              <Badge variant="outline" className={cn("text-xs", getSentimentColor(reaction.sentiment))}>
+                                {reaction.sentiment === "positive" ? <ThumbsUp className="h-3 w-3 mr-1" /> : 
+                                 reaction.sentiment === "negative" ? <ThumbsDown className="h-3 w-3 mr-1" /> : null}
+                                {reaction.sentiment}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">{reaction.content || reaction.summary}</p>
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            {reaction.engagementCount > 0 && (
+                              <span>{reaction.engagementCount.toLocaleString()} engagements</span>
+                            )}
+                            {reaction.publishedAt && (
+                              <span>{new Date(reaction.publishedAt).toLocaleDateString()}</span>
+                            )}
+                            {reaction.url && (
+                              <a href={reaction.url} target="_blank" rel="noopener noreferrer" className="text-[#0176D3] hover:underline">
+                                View on X
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="articles">
+          <Card className="bg-white shadow-sm">
+            <CardHeader className="border-b border-gray-100">
+              <CardTitle className="text-base font-semibold text-[#080707]">News & Articles</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {articles.length === 0 ? (
+                <div className="p-8 text-center">
+                  <Newspaper className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-muted-foreground">No articles available yet</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {articles.map((article) => (
+                    <div key={article.id} className="p-4 hover:bg-gray-50 transition-colors" data-testid={`article-${article.id}`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-medium text-[#080707]">{article.title}</h4>
+                            {article.sentiment && (
+                              <Badge variant="outline" className={cn("text-xs", getSentimentColor(article.sentiment))}>
+                                {article.sentiment}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground mb-2">
+                            {article.source} • {article.publishedAt ? new Date(article.publishedAt).toLocaleDateString() : "Recent"}
+                          </div>
+                          {article.summary && (
+                            <p className="text-sm text-muted-foreground line-clamp-2">{article.summary}</p>
+                          )}
+                        </div>
+                        {article.url && (
+                          <a href={article.url} target="_blank" rel="noopener noreferrer">
+                            <Button variant="ghost" size="sm" className="text-[#0176D3]">
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
