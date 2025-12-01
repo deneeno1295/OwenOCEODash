@@ -1204,6 +1204,375 @@ Provide at least 10-15 high-quality, relevant contacts.`;
     }
   });
 
+  // ==========================================
+  // Agent Routes - On-demand agent triggers
+  // ==========================================
+
+  // Import agents lazily to avoid circular dependencies
+  const getAgents = async () => {
+    const { getDashboardAgent, getSentimentAgent, getStartupAgent, getKeyPeopleAgent, getCloudIntelAgent, getSchedulerStatus, triggerJob } = await import("./agents");
+    return { getDashboardAgent, getSentimentAgent, getStartupAgent, getKeyPeopleAgent, getCloudIntelAgent, getSchedulerStatus, triggerJob };
+  };
+
+  // Get scheduler status
+  app.get("/api/agents/status", async (req, res) => {
+    try {
+      const { getSchedulerStatus } = await getAgents();
+      const status = getSchedulerStatus();
+      res.json(status);
+    } catch (error) {
+      console.error("Failed to get agent status:", error);
+      res.status(500).json({ error: "Failed to get agent status" });
+    }
+  });
+
+  // Trigger a scheduled job manually
+  app.post("/api/agents/trigger/:jobName", async (req, res) => {
+    try {
+      const { triggerJob } = await getAgents();
+      const success = await triggerJob(req.params.jobName);
+      if (success) {
+        res.json({ success: true, message: `Job ${req.params.jobName} triggered` });
+      } else {
+        res.status(404).json({ error: "Job not found" });
+      }
+    } catch (error) {
+      console.error("Failed to trigger job:", error);
+      res.status(500).json({ error: "Failed to trigger job" });
+    }
+  });
+
+  // Dashboard Agent - Analyze company
+  app.post("/api/agents/dashboard/analyze", async (req, res) => {
+    try {
+      const schema = z.object({
+        company: z.string().min(1),
+        quarter: z.string().optional(),
+      });
+      const { company, quarter } = schema.parse(req.body);
+      
+      const { getDashboardAgent } = await getAgents();
+      const agent = getDashboardAgent();
+      const result = await agent.analyzeCompany(company, quarter);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Dashboard agent error:", error);
+      res.status(500).json({ error: error.message || "Agent execution failed" });
+    }
+  });
+
+  // Dashboard Agent - Compare companies
+  app.post("/api/agents/dashboard/compare", async (req, res) => {
+    try {
+      const schema = z.object({
+        companies: z.array(z.string()).min(2),
+      });
+      const { companies } = schema.parse(req.body);
+      
+      const { getDashboardAgent } = await getAgents();
+      const agent = getDashboardAgent();
+      const result = await agent.compareCompanies(companies);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Dashboard agent error:", error);
+      res.status(500).json({ error: error.message || "Agent execution failed" });
+    }
+  });
+
+  // Dashboard Agent - Market sentiment
+  app.post("/api/agents/dashboard/sentiment", async (req, res) => {
+    try {
+      const schema = z.object({
+        company: z.string().min(1),
+      });
+      const { company } = schema.parse(req.body);
+      
+      const { getDashboardAgent } = await getAgents();
+      const agent = getDashboardAgent();
+      const result = await agent.getMarketSentiment(company);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Dashboard agent error:", error);
+      res.status(500).json({ error: error.message || "Agent execution failed" });
+    }
+  });
+
+  // Sentiment Agent - Track competitor
+  app.post("/api/agents/sentiment/track", async (req, res) => {
+    try {
+      const schema = z.object({
+        competitor: z.string().optional(),
+        competitors: z.array(z.string()).optional(),
+      });
+      const data = schema.parse(req.body);
+      
+      const { getSentimentAgent } = await getAgents();
+      const agent = getSentimentAgent();
+      
+      let result;
+      if (data.competitors && data.competitors.length > 0) {
+        result = await agent.trackMultipleCompetitors(data.competitors);
+      } else if (data.competitor) {
+        result = await agent.trackCompetitorSentiment(data.competitor);
+      } else {
+        return res.status(400).json({ error: "Provide either 'competitor' or 'competitors'" });
+      }
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Sentiment agent error:", error);
+      res.status(500).json({ error: error.message || "Agent execution failed" });
+    }
+  });
+
+  // Startup Agent - Research startup
+  app.post("/api/agents/startup/research", async (req, res) => {
+    try {
+      const schema = z.object({
+        startupName: z.string().min(1),
+        domain: z.string().optional(),
+      });
+      const { startupName, domain } = schema.parse(req.body);
+      
+      const { getStartupAgent } = await getAgents();
+      const agent = getStartupAgent();
+      const result = await agent.researchStartup(startupName, domain);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Startup agent error:", error);
+      res.status(500).json({ error: error.message || "Agent execution failed" });
+    }
+  });
+
+  // Startup Agent - Analyze M&A fit
+  app.post("/api/agents/startup/acquisition-fit", async (req, res) => {
+    try {
+      const schema = z.object({
+        startupName: z.string().min(1),
+        acquirer: z.string().optional().default("Salesforce"),
+      });
+      const { startupName, acquirer } = schema.parse(req.body);
+      
+      const { getStartupAgent } = await getAgents();
+      const agent = getStartupAgent();
+      const result = await agent.analyzeAcquisitionFit(startupName, acquirer);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Startup agent error:", error);
+      res.status(500).json({ error: error.message || "Agent execution failed" });
+    }
+  });
+
+  // Startup Agent - Discover startups
+  app.post("/api/agents/startup/discover", async (req, res) => {
+    try {
+      const schema = z.object({
+        industry: z.string().min(1),
+        stage: z.string().optional(),
+        location: z.string().optional(),
+      });
+      const { industry, stage, location } = schema.parse(req.body);
+      
+      const { getStartupAgent } = await getAgents();
+      const agent = getStartupAgent();
+      const result = await agent.discoverStartups(industry, stage, location);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Startup agent error:", error);
+      res.status(500).json({ error: error.message || "Agent execution failed" });
+    }
+  });
+
+  // Key People Agent - Discover by location
+  app.post("/api/agents/key-people/discover/location", async (req, res) => {
+    try {
+      const schema = z.object({
+        location: z.string().min(1),
+        country: z.string().optional(),
+        purpose: z.string().optional(),
+      });
+      const { location, country, purpose } = schema.parse(req.body);
+      
+      const { getKeyPeopleAgent } = await getAgents();
+      const agent = getKeyPeopleAgent();
+      const result = await agent.discoverByLocation(location, country, purpose);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Key people agent error:", error);
+      res.status(500).json({ error: error.message || "Agent execution failed" });
+    }
+  });
+
+  // Key People Agent - Discover by event
+  app.post("/api/agents/key-people/discover/event", async (req, res) => {
+    try {
+      const schema = z.object({
+        eventName: z.string().min(1),
+        location: z.string().optional(),
+        focusAreas: z.array(z.string()).optional(),
+      });
+      const { eventName, location, focusAreas } = schema.parse(req.body);
+      
+      const { getKeyPeopleAgent } = await getAgents();
+      const agent = getKeyPeopleAgent();
+      const result = await agent.discoverByEvent(eventName, location, focusAreas);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Key people agent error:", error);
+      res.status(500).json({ error: error.message || "Agent execution failed" });
+    }
+  });
+
+  // Key People Agent - Discover by industry
+  app.post("/api/agents/key-people/discover/industry", async (req, res) => {
+    try {
+      const schema = z.object({
+        industry: z.string().min(1),
+        geography: z.string().optional(),
+        focus: z.string().optional(),
+      });
+      const { industry, geography, focus } = schema.parse(req.body);
+      
+      const { getKeyPeopleAgent } = await getAgents();
+      const agent = getKeyPeopleAgent();
+      const result = await agent.discoverByIndustry(industry, geography, focus);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Key people agent error:", error);
+      res.status(500).json({ error: error.message || "Agent execution failed" });
+    }
+  });
+
+  // Key People Agent - Deep research on person
+  app.post("/api/agents/key-people/research", async (req, res) => {
+    try {
+      const schema = z.object({
+        personName: z.string().min(1),
+        title: z.string().optional(),
+        organization: z.string().optional(),
+      });
+      const { personName, title, organization } = schema.parse(req.body);
+      
+      const { getKeyPeopleAgent } = await getAgents();
+      const agent = getKeyPeopleAgent();
+      const result = await agent.deepResearch(personName, title, organization);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Key people agent error:", error);
+      res.status(500).json({ error: error.message || "Agent execution failed" });
+    }
+  });
+
+  // Key People Agent - Meeting prep
+  app.post("/api/agents/key-people/meeting-prep", async (req, res) => {
+    try {
+      const schema = z.object({
+        personName: z.string().min(1),
+        context: z.string().min(1),
+        objectives: z.array(z.string()).optional(),
+      });
+      const { personName, context, objectives } = schema.parse(req.body);
+      
+      const { getKeyPeopleAgent } = await getAgents();
+      const agent = getKeyPeopleAgent();
+      const result = await agent.generateMeetingPrep(personName, context, objectives);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Key people agent error:", error);
+      res.status(500).json({ error: error.message || "Agent execution failed" });
+    }
+  });
+
+  // Cloud Intel Agent - Analyze category
+  app.post("/api/agents/cloud-intel/analyze", async (req, res) => {
+    try {
+      const schema = z.object({
+        category: z.string().min(1),
+        competitors: z.array(z.string()).optional(),
+      });
+      const { category, competitors } = schema.parse(req.body);
+      
+      const { getCloudIntelAgent } = await getAgents();
+      const agent = getCloudIntelAgent();
+      const result = await agent.analyzeCloudCategory(category, competitors);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Cloud intel agent error:", error);
+      res.status(500).json({ error: error.message || "Agent execution failed" });
+    }
+  });
+
+  // Cloud Intel Agent - Track competitor updates
+  app.post("/api/agents/cloud-intel/track", async (req, res) => {
+    try {
+      const schema = z.object({
+        competitor: z.string().min(1),
+      });
+      const { competitor } = schema.parse(req.body);
+      
+      const { getCloudIntelAgent } = await getAgents();
+      const agent = getCloudIntelAgent();
+      const result = await agent.trackCompetitorUpdates(competitor);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Cloud intel agent error:", error);
+      res.status(500).json({ error: error.message || "Agent execution failed" });
+    }
+  });
+
+  // Cloud Intel Agent - Generate battle card
+  app.post("/api/agents/cloud-intel/battle-card", async (req, res) => {
+    try {
+      const schema = z.object({
+        ownProduct: z.string().min(1),
+        competitor: z.string().min(1),
+      });
+      const { ownProduct, competitor } = schema.parse(req.body);
+      
+      const { getCloudIntelAgent } = await getAgents();
+      const agent = getCloudIntelAgent();
+      const result = await agent.generateBattleCard(ownProduct, competitor);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Cloud intel agent error:", error);
+      res.status(500).json({ error: error.message || "Agent execution failed" });
+    }
+  });
+
+  // Cloud Intel Agent - Weekly digest
+  app.post("/api/agents/cloud-intel/digest", async (req, res) => {
+    try {
+      const schema = z.object({
+        products: z.array(z.string()).min(1),
+        competitors: z.array(z.string()).min(1),
+      });
+      const { products, competitors } = schema.parse(req.body);
+      
+      const { getCloudIntelAgent } = await getAgents();
+      const agent = getCloudIntelAgent();
+      const result = await agent.generateWeeklyDigest(products, competitors);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Cloud intel agent error:", error);
+      res.status(500).json({ error: error.message || "Agent execution failed" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
