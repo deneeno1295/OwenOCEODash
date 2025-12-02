@@ -19,7 +19,14 @@ import {
   Trash2,
   Edit2,
   Check,
-  X
+  X,
+  Cloud,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+  ExternalLink,
+  User,
+  Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -72,9 +79,33 @@ interface AgentSpace {
   updatedAt: string;
 }
 
+interface SalesforceStatus {
+  configured: boolean;
+  connected: boolean;
+  instanceUrl: string | null;
+  organizationId: string | null;
+  loginUrl: string;
+  authenticatedAt: string | null;
+  currentUser: {
+    name: string;
+    email: string;
+    profileName: string | null;
+    isAdmin: boolean;
+  } | null;
+}
+
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState("cadences");
+  const [activeTab, setActiveTab] = useState("salesforce");
   const queryClient = useQueryClient();
+
+  const { data: salesforceStatus, isLoading: salesforceLoading } = useQuery<SalesforceStatus>({
+    queryKey: ["settings", "salesforce-status"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/salesforce-status");
+      if (!res.ok) throw new Error("Failed to fetch Salesforce status");
+      return res.json();
+    },
+  });
 
   const { data: cadences = [], isLoading: cadencesLoading } = useQuery<AgentCadence[]>({
     queryKey: ["settings", "cadences"],
@@ -125,6 +156,14 @@ export default function Settings() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="bg-white border border-gray-200 p-1">
           <TabsTrigger 
+            value="salesforce" 
+            className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white"
+            data-testid="tab-salesforce"
+          >
+            <Cloud className="h-4 w-4 mr-2" />
+            Salesforce
+          </TabsTrigger>
+          <TabsTrigger 
             value="cadences" 
             className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white"
             data-testid="tab-cadences"
@@ -157,6 +196,10 @@ export default function Settings() {
             Spaces
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="salesforce">
+          <SalesforceTab status={salesforceStatus} isLoading={salesforceLoading} />
+        </TabsContent>
 
         <TabsContent value="cadences">
           <CadencesTab cadences={cadences} isLoading={cadencesLoading} />
@@ -945,5 +988,244 @@ function SpacesTab({ spaces, isLoading }: { spaces: AgentSpace[]; isLoading: boo
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function SalesforceTab({ status, isLoading }: { status: SalesforceStatus | undefined; isLoading: boolean }) {
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleTestConnection = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/settings/salesforce-test", { method: "POST" });
+      const data = await res.json();
+      setTestResult({
+        success: data.success,
+        message: data.success ? "Connection successful!" : data.error || "Connection failed",
+      });
+    } catch (error) {
+      setTestResult({
+        success: false,
+        message: "Failed to test connection",
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="shadow-sm bg-white">
+        <CardContent className="p-8 text-center text-muted-foreground">
+          <RefreshCw className="h-8 w-8 mx-auto mb-4 animate-spin text-[#0176D3]" />
+          <p>Loading Salesforce configuration...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Connection Status Card */}
+      <Card className="shadow-sm bg-white">
+        <CardHeader className="border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base font-semibold text-[#080707]">Salesforce Connection</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">Current authentication and organization status</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {status?.configured ? (
+                <Badge className="bg-green-50 text-green-700 border-green-200">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Configured
+                </Badge>
+              ) : (
+                <Badge className="bg-amber-50 text-amber-700 border-amber-200">
+                  <XCircle className="h-3 w-3 mr-1" />
+                  Not Configured
+                </Badge>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6">
+          {!status?.configured ? (
+            <div className="text-center py-8">
+              <Cloud className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-semibold text-[#080707] mb-2">Salesforce Not Configured</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">
+                To enable Salesforce authentication, set the following environment variables:
+              </p>
+              <div className="bg-gray-50 rounded-lg p-4 text-left max-w-md mx-auto">
+                <code className="text-xs text-gray-600 block mb-1">SALESFORCE_CLIENT_ID</code>
+                <code className="text-xs text-gray-600 block mb-1">SALESFORCE_CLIENT_SECRET</code>
+                <code className="text-xs text-gray-600 block mb-1">SALESFORCE_REDIRECT_URI (optional)</code>
+                <code className="text-xs text-gray-600 block">SALESFORCE_LOGIN_URL (optional)</code>
+              </div>
+              <a
+                href="https://help.salesforce.com/s/articleView?id=sf.remoteaccess_oauth_web_server_flow.htm"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-[#0176D3] hover:underline mt-4"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Salesforce OAuth Documentation
+              </a>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Connection Status */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wide">Connection Status</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      {status.connected ? (
+                        <>
+                          <CheckCircle2 className="h-5 w-5 text-green-600" />
+                          <span className="font-medium text-green-700">Connected</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-5 w-5 text-gray-400" />
+                          <span className="font-medium text-gray-500">Not Connected</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wide">Login URL</Label>
+                    <p className="text-sm font-mono text-[#080707] mt-1">{status.loginUrl}</p>
+                  </div>
+
+                  {status.instanceUrl && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wide">Instance URL</Label>
+                      <p className="text-sm font-mono text-[#080707] mt-1">{status.instanceUrl}</p>
+                    </div>
+                  )}
+
+                  {status.organizationId && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wide">Organization ID</Label>
+                      <p className="text-sm font-mono text-[#080707] mt-1">{status.organizationId}</p>
+                    </div>
+                  )}
+
+                  {status.authenticatedAt && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wide">Authenticated At</Label>
+                      <p className="text-sm text-[#080707] mt-1">
+                        {new Date(status.authenticatedAt).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Current User */}
+                {status.currentUser && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="h-10 w-10 rounded-full bg-[#0176D3] flex items-center justify-center">
+                        <User className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-[#080707]">{status.currentUser.name}</p>
+                        <p className="text-sm text-muted-foreground">{status.currentUser.email}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Profile:</span>
+                        <span className="text-sm font-medium">{status.currentUser.profileName || "Unknown"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {status.currentUser.isAdmin ? (
+                          <Badge className="bg-purple-50 text-purple-700 border-purple-200">
+                            <Shield className="h-3 w-3 mr-1" />
+                            Admin
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-gray-50 text-gray-600 border-gray-200">
+                            Standard User
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Test Connection */}
+              <div className="border-t border-gray-100 pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-[#080707]">Test Connection</p>
+                    <p className="text-sm text-muted-foreground">Verify the Salesforce API connection is working</p>
+                  </div>
+                  <Button
+                    onClick={handleTestConnection}
+                    disabled={isTesting || !status.connected}
+                    variant="outline"
+                    className="border-[#0176D3] text-[#0176D3] hover:bg-[#0176D3] hover:text-white"
+                  >
+                    {isTesting ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Testing...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Test Connection
+                      </>
+                    )}
+                  </Button>
+                </div>
+                {testResult && (
+                  <div className={cn(
+                    "mt-3 p-3 rounded-lg flex items-center gap-2",
+                    testResult.success ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+                  )}>
+                    {testResult.success ? (
+                      <CheckCircle2 className="h-5 w-5" />
+                    ) : (
+                      <XCircle className="h-5 w-5" />
+                    )}
+                    <span className="text-sm">{testResult.message}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Admin Profiles Configuration */}
+      <Card className="shadow-sm bg-white">
+        <CardHeader className="border-b border-gray-100">
+          <CardTitle className="text-base font-semibold text-[#080707]">Admin Access Configuration</CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            Users with these Salesforce Profiles will have admin access to Settings
+          </p>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide">Admin Profiles (SALESFORCE_ADMIN_PROFILES)</Label>
+            <p className="text-sm font-mono text-[#080707] mt-2">
+              System Administrator
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Configure via environment variable. Use comma-separated values for multiple profiles.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

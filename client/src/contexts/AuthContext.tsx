@@ -7,6 +7,9 @@ interface User {
   name: string;
   organizationId: string;
   instanceUrl: string;
+  profileName?: string;
+  isAdmin: boolean;
+  authenticatedAt?: string;
 }
 
 interface AuthConfig {
@@ -19,6 +22,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   isConfigured: boolean;
+  isAdmin: boolean;
   login: () => void;
   logout: () => Promise<void>;
 }
@@ -53,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isConfigured = authConfig?.configured ?? false;
   const isAuthenticated = isConfigured ? (authData?.authenticated ?? false) : true;
   const user = authData?.user ?? null;
+  const isAdmin = user?.isAdmin ?? false;
   const isLoading = configLoading || (isConfigured && authLoading);
 
   const login = () => {
@@ -79,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, isLoading: isLoading || isLoggingOut, isConfigured, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, isLoading: isLoading || isLoggingOut, isConfigured, isAdmin, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

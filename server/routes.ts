@@ -23,7 +23,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import OpenAI from "openai";
-import { requireAuth } from "./auth";
+import { requireAuth, requireAdmin, getSalesforceStatus } from "./auth";
 
 function apiAuthMiddleware(req: Request, res: Response, next: NextFunction) {
   if (process.env.SALESFORCE_CLIENT_ID && process.env.SALESFORCE_CLIENT_SECRET) {
@@ -930,6 +930,43 @@ Provide at least 10-15 high-quality, relevant contacts.`;
     } catch (error) {
       console.error("AI research error:", error);
       res.status(500).json({ error: "Failed to run AI research" });
+    }
+  });
+
+  // Salesforce Connection Status (Admin only)
+  app.get("/api/settings/salesforce-status", requireAdmin, (req, res) => {
+    try {
+      const status = getSalesforceStatus(req);
+      res.json(status);
+    } catch (error) {
+      console.error("Failed to get Salesforce status:", error);
+      res.status(500).json({ error: "Failed to get Salesforce status" });
+    }
+  });
+
+  // Test Salesforce Connection (Admin only)
+  app.post("/api/settings/salesforce-test", requireAdmin, async (req, res) => {
+    try {
+      const user = req.session.user;
+      if (!user?.accessToken || !user?.instanceUrl) {
+        return res.json({ success: false, error: "No active Salesforce connection" });
+      }
+
+      // Try to make a simple API call to verify the connection
+      const response = await fetch(`${user.instanceUrl}/services/data/v59.0/limits`, {
+        headers: {
+          Authorization: `Bearer ${user.accessToken}`,
+        },
+      });
+
+      if (response.ok) {
+        res.json({ success: true, message: "Connection successful" });
+      } else {
+        const errorText = await response.text();
+        res.json({ success: false, error: `API call failed: ${response.status}`, details: errorText });
+      }
+    } catch (error: any) {
+      res.json({ success: false, error: error.message || "Connection test failed" });
     }
   });
 

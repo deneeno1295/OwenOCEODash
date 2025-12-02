@@ -42,7 +42,7 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
-  const { user, logout, isConfigured } = useAuth();
+  const { user, logout, isConfigured, isAdmin } = useAuth();
 
   const displayName = user?.name || "Marc B.";
   const displayEmail = user?.email || "marc.b@oceo.ai";
@@ -150,12 +150,15 @@ export default function Layout({ children }: LayoutProps) {
                   <span>Profile</span>
                 </DropdownMenuItem>
               </Link>
-              <Link href="/settings">
-                <DropdownMenuItem className="cursor-pointer" data-testid="dropdown-settings">
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
-              </Link>
+              {/* Settings is only visible to admins (or when auth is not configured for dev mode) */}
+              {(isAdmin || !isConfigured) && (
+                <Link href="/settings">
+                  <DropdownMenuItem className="cursor-pointer" data-testid="dropdown-settings">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </DropdownMenuItem>
+                </Link>
+              )}
               <DropdownMenuItem className="cursor-pointer" data-testid="dropdown-help">
                 <HelpCircle className="mr-2 h-4 w-4" />
                 <span>Help & Support</span>
