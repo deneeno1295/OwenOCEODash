@@ -111,10 +111,17 @@ export default function LiveEarningsWidget({
       }
     });
 
-    eventSource.addEventListener("error", (e) => {
-      const payload = JSON.parse(e.data);
-      if (payload.company.toLowerCase() === company.toLowerCase()) {
-        setError(payload.error);
+    eventSource.addEventListener("error", (e: MessageEvent) => {
+      // Only parse if data exists (custom error events from server)
+      if (e.data) {
+        try {
+          const payload = JSON.parse(e.data);
+          if (payload.company?.toLowerCase() === company.toLowerCase()) {
+            setError(payload.error);
+          }
+        } catch {
+          // Ignore parse errors for non-JSON error events
+        }
       }
     });
 

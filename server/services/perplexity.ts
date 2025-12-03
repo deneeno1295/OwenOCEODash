@@ -42,7 +42,7 @@ async function callPerplexity(
   const response = await axios.post<PerplexityResponse>(
     PERPLEXITY_BASE_URL,
     {
-      model: "llama-3.1-sonar-large-128k-online",
+      model: "sonar",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -168,10 +168,61 @@ Respond in JSON format with keys: articles (array), overallSentiment`;
   };
 }
 
+/**
+ * Get recent analyst reports and ratings for a company
+ */
+export async function getAnalystReports(
+  company: string
+): Promise<{
+  reports: {
+    analyst: string;
+    firm: string;
+    rating: string;
+    priceTarget: string;
+    date: string;
+    summary: string;
+  }[];
+  consensusRating: string;
+  averagePriceTarget: string;
+}> {
+  const systemPrompt = `You are a financial analyst tracking Wall Street coverage and ratings.
+Provide accurate, recent analyst reports with specific price targets and ratings.
+Focus on reports from the past 30 days.`;
+
+  const userPrompt = `Get the most recent analyst reports and ratings for ${company}. Include:
+- Analyst name and firm
+- Rating (Buy/Hold/Sell or equivalent)
+- Price target
+- Date of the report
+- Brief summary of the analyst's key points
+
+Also provide the consensus rating and average price target.
+
+Respond in JSON format with keys: reports (array with analyst, firm, rating, priceTarget, date, summary), consensusRating, averagePriceTarget`;
+
+  const response = await callPerplexity(systemPrompt, userPrompt);
+  
+  try {
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    // If parsing fails, return structured default
+  }
+  
+  return {
+    reports: [],
+    consensusRating: "N/A",
+    averagePriceTarget: "N/A",
+  };
+}
+
 export default {
   searchMarketData,
   getEarningsData,
   getCompanyNews,
+  getAnalystReports,
 };
 
 

@@ -106,6 +106,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Refresh competitor content from all AI services
+  app.post("/api/competitors/:id/content/refresh", async (req, res) => {
+    try {
+      const competitorId = parseInt(req.params.id);
+      const competitor = await storage.getCompetitor(competitorId);
+      
+      if (!competitor) {
+        return res.status(404).json({ error: "Competitor not found" });
+      }
+
+      const companyName = competitor.name;
+      console.log(`[ContentRefresh] Fetching content for ${companyName}...`);
+
+      // Import services dynamically to avoid circular dependencies
+      const { getAnalystReports } = await import("./services/perplexity");
+      const { getEarningsTranscriptSummary } = await import("./services/gemini");
+      const { getTwitterReactions } = await import("./services/grok");
+      const { getCompanyArticles } = await import("./services/openai-content");
+
+      // Fetch content from all services in parallel
+      const results = await Promise.allSettled([
+        getAnalystReports(companyName),
+        getEarningsTranscriptSummary(companyName),
+        getTwitterReactions(companyName),
+        getCompanyArticles(companyName),
+      ]);
+
+      const savedContent: any[] = [];
+
+      // Process analyst reports (Perplexity)
+      if (results[0].status === "fulfilled" && results[0].value.reports.length > 0) {
+        for (const report of results[0].value.reports) {
+          const content = await storage.createCompetitorContent({
+            competitorId,
+            contentType: "analyst_report",
+            title: `${report.firm}: ${report.rating}`,
+            content: report.summary,
+            source: report.firm,
+            sourceUrl: null,
+            metadata: JSON.stringify({
+              analyst: report.analyst,
+              priceTarget: report.priceTarget,
+              date: report.date,
+              consensusRating: results[0].value.consensusRating,
+              averagePriceTarget: results[0].value.averagePriceTarget,
+            }),
+          });
+          savedContent.push(content);
+        }
+        console.log(`[ContentRefresh] Saved ${results[0].value.reports.length} analyst reports`);
+      }
+
+      // Process transcripts (Gemini)
+      if (results[1].status === "fulfilled" && results[1].value.executiveSummary) {
+        const transcript = results[1].value;
+        const content = await storage.createCompetitorContent({
+          competitorId,
+          contentType: "transcript",
+          title: `Earnings Call Summary - ${companyName}`,
+          content: transcript.executiveSummary,
+          source: "Earnings Call",
+          sourceUrl: null,
+          metadata: JSON.stringify({
+            keyQuotes: transcript.keyQuotes,
+            guidanceDetails: transcript.guidanceDetails,
+            analystQA: transcript.analystQA,
+            sentiment: transcript.sentiment,
+          }),
+        });
+        savedContent.push(content);
+        console.log(`[ContentRefresh] Saved transcript summary`);
+      }
+
+      // Process Twitter reactions (Grok)
+      if (results[2].status === "fulfilled" && results[2].value.tweets.length > 0) {
+        for (const tweet of results[2].value.tweets.slice(0, 5)) { // Limit to 5 tweets
+          const content = await storage.createCompetitorContent({
+            competitorId,
+            contentType: "x_reaction",
+            title: `@${tweet.handle}`,
+            content: tweet.content,
+            source: "X/Twitter",
+            sourceUrl: `https://twitter.com/${tweet.handle}`,
+            metadata: JSON.stringify({
+              author: tweet.author,
+              engagement: tweet.engagement,
+              sentiment: tweet.sentiment,
+              isVerified: tweet.isVerified,
+              overallSentiment: results[2].value.overallSentiment,
+              trendingTopics: results[2].value.trendingTopics,
+            }),
+          });
+          savedContent.push(content);
+        }
+        console.log(`[ContentRefresh] Saved ${Math.min(results[2].value.tweets.length, 5)} Twitter reactions`);
+      }
+
+      // Process articles (OpenAI)
+      if (results[3].status === "fulfilled" && results[3].value.articles.length > 0) {
+        for (const article of results[3].value.articles.slice(0, 5)) { // Limit to 5 articles
+          const content = await storage.createCompetitorContent({
+            competitorId,
+            contentType: "article",
+            title: article.title,
+            content: article.summary,
+            source: article.source,
+            sourceUrl: null,
+            metadata: JSON.stringify({
+              date: article.date,
+              keyPoints: article.keyPoints,
+              sentiment: article.sentiment,
+              relevance: article.relevance,
+              themes: results[3].value.themes,
+              overallNarrative: results[3].value.overallNarrative,
+            }),
+          });
+          savedContent.push(content);
+        }
+        console.log(`[ContentRefresh] Saved ${Math.min(results[3].value.articles.length, 5)} articles`);
+      }
+
+      // Log any errors
+      results.forEach((result, index) => {
+        if (result.status === "rejected") {
+          const services = ["Perplexity (analysts)", "Gemini (transcripts)", "Grok (Twitter)", "OpenAI (articles)"];
+          console.error(`[ContentRefresh] ${services[index]} failed:`, result.reason?.message || result.reason);
+        }
+      });
+
+      res.json({
+        success: true,
+        message: `Fetched and saved ${savedContent.length} content items for ${companyName}`,
+        contentCount: savedContent.length,
+        content: savedContent,
+      });
+
+    } catch (error: any) {
+      console.error("[ContentRefresh] Error:", error.message);
+      res.status(500).json({ error: "Failed to refresh content", details: error.message });
+    }
+  });
+
   // Sentiment Analysis Routes
   app.get("/api/sentiment/:competitorId", async (req, res) => {
     try {

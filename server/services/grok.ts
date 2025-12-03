@@ -181,10 +181,64 @@ Respond in JSON format.`;
   };
 }
 
+/**
+ * Get Twitter/X reactions and notable tweets about a company
+ */
+export async function getTwitterReactions(
+  company: string,
+  topic?: string
+): Promise<{
+  tweets: {
+    author: string;
+    handle: string;
+    content: string;
+    engagement: string;
+    sentiment: "positive" | "negative" | "neutral";
+    isVerified: boolean;
+  }[];
+  overallSentiment: number;
+  trendingTopics: string[];
+  notableAccounts: string[];
+}> {
+  const topicContext = topic ? ` regarding ${topic}` : "";
+  const systemPrompt = `You are an expert at analyzing Twitter/X conversations about companies and financial news.
+Focus on tweets from notable accounts: financial analysts, industry experts, journalists, and verified business accounts.
+Identify the most impactful and discussed tweets.`;
+
+  const userPrompt = `Find the most notable recent tweets about ${company}${topicContext}. Include:
+- Tweets from influential accounts (analysts, journalists, industry experts)
+- Key reactions to recent news or earnings
+- Overall sentiment trending on Twitter
+- Trending topics related to the company
+
+For each tweet provide: author name, handle, content, engagement level (high/medium/low), sentiment, and if verified.
+
+Respond in JSON format with keys: tweets (array with author, handle, content, engagement, sentiment, isVerified), overallSentiment (0-1 scale), trendingTopics (array), notableAccounts (array)`;
+
+  const response = await callGrok(systemPrompt, userPrompt, { temperature: 0.3 });
+  
+  try {
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    // If parsing fails, return structured default
+  }
+  
+  return {
+    tweets: [],
+    overallSentiment: 0.5,
+    trendingTopics: [],
+    notableAccounts: [],
+  };
+}
+
 export default {
   analyzeSentiment,
   extractTopics,
   analyzeSocialSentiment,
+  getTwitterReactions,
 };
 
 

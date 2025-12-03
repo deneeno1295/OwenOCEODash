@@ -66,10 +66,56 @@ export async function generateStructuredOutput<T>(
   return JSON.parse(jsonStr) as T;
 }
 
+/**
+ * Get earnings call transcript summary for a company
+ */
+export async function getEarningsTranscriptSummary(
+  company: string,
+  quarter?: string
+): Promise<{
+  keyQuotes: {
+    speaker: string;
+    role: string;
+    quote: string;
+    topic: string;
+  }[];
+  executiveSummary: string;
+  guidanceDetails: string;
+  analystQA: {
+    question: string;
+    answer: string;
+  }[];
+  sentiment: "bullish" | "bearish" | "neutral";
+}> {
+  const quarterStr = quarter || "most recent";
+  const prompt = `Analyze the ${quarterStr} earnings call for ${company}. Provide:
+
+1. Key quotes from executives (CEO, CFO) with their role and the topic discussed
+2. Executive summary of the call (2-3 sentences)
+3. Guidance details mentioned
+4. Notable Q&A exchanges with analysts
+5. Overall sentiment of the call (bullish/bearish/neutral)
+
+Respond in JSON format with keys: keyQuotes (array with speaker, role, quote, topic), executiveSummary, guidanceDetails, analystQA (array with question, answer), sentiment`;
+
+  try {
+    return await generateStructuredOutput(prompt);
+  } catch (e) {
+    return {
+      keyQuotes: [],
+      executiveSummary: `Unable to fetch transcript summary for ${company}`,
+      guidanceDetails: "N/A",
+      analystQA: [],
+      sentiment: "neutral",
+    };
+  }
+}
+
 export default {
   createGeminiModel,
   generateCompletion,
   generateStructuredOutput,
+  getEarningsTranscriptSummary,
 };
 
 

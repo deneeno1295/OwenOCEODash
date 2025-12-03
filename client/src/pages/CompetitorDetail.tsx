@@ -102,7 +102,9 @@ interface CompetitorDetailProps {
 
 export default function CompetitorDetail({ id }: CompetitorDetailProps) {
   const [isRefreshingLive, setIsRefreshingLive] = useState(false);
+  const [isRefreshingContent, setIsRefreshingContent] = useState(false);
   const [liveData, setLiveData] = useState<any>(null);
+  const [contentRefreshResult, setContentRefreshResult] = useState<{ success: boolean; message: string } | null>(null);
   const queryClient = useQueryClient();
 
   const { data: competitor, isLoading, error } = useQuery<Competitor>({
@@ -145,6 +147,39 @@ export default function CompetitorDetail({ id }: CompetitorDetailProps) {
       console.error("Failed to refresh live data:", err);
     } finally {
       setIsRefreshingLive(false);
+    }
+  };
+
+  // Refresh all competitor content (analyst reports, transcripts, tweets, articles)
+  const refreshContent = async () => {
+    setIsRefreshingContent(true);
+    setContentRefreshResult(null);
+    try {
+      const res = await fetch(`/api/competitors/${id}/content/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      
+      // Check content type before parsing
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        setContentRefreshResult({ success: false, message: "Server error - API keys may not be configured" });
+        return;
+      }
+      
+      const data = await res.json();
+      if (res.ok) {
+        setContentRefreshResult({ success: true, message: data.message });
+        // Refresh the content query
+        queryClient.invalidateQueries({ queryKey: ["competitor-content", id] });
+      } else {
+        setContentRefreshResult({ success: false, message: data.error || "Failed to refresh content" });
+      }
+    } catch (err: any) {
+      console.error("Failed to refresh content:", err);
+      setContentRefreshResult({ success: false, message: "Failed to fetch content - check API configuration" });
+    } finally {
+      setIsRefreshingContent(false);
     }
   };
 
@@ -280,28 +315,55 @@ export default function CompetitorDetail({ id }: CompetitorDetailProps) {
       </Card>
 
       <Tabs defaultValue="earnings" className="space-y-4">
-        <TabsList className="bg-white border border-gray-200 p-1 flex-wrap">
-          <TabsTrigger value="earnings" className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white gap-2" data-testid="tab-earnings">
-            <DollarSign className="h-4 w-4" />
-            Earnings
-          </TabsTrigger>
-          <TabsTrigger value="analysts" className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white gap-2" data-testid="tab-analysts">
-            <BarChart3 className="h-4 w-4" />
-            Analyst Reports ({analystReports.length})
-          </TabsTrigger>
-          <TabsTrigger value="transcripts" className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white gap-2" data-testid="tab-transcripts">
-            <FileText className="h-4 w-4" />
-            Transcripts ({transcripts.length})
-          </TabsTrigger>
-          <TabsTrigger value="reactions" className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white gap-2" data-testid="tab-reactions">
-            <Twitter className="h-4 w-4" />
-            X Reactions ({xReactions.length})
-          </TabsTrigger>
-          <TabsTrigger value="articles" className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white gap-2" data-testid="tab-articles">
-            <Newspaper className="h-4 w-4" />
-            Articles ({articles.length})
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <TabsList className="bg-white border border-gray-200 p-1 flex-wrap">
+            <TabsTrigger value="earnings" className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white gap-2" data-testid="tab-earnings">
+              <DollarSign className="h-4 w-4" />
+              Earnings
+            </TabsTrigger>
+            <TabsTrigger value="analysts" className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white gap-2" data-testid="tab-analysts">
+              <BarChart3 className="h-4 w-4" />
+              Analyst Reports ({analystReports.length})
+            </TabsTrigger>
+            <TabsTrigger value="transcripts" className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white gap-2" data-testid="tab-transcripts">
+              <FileText className="h-4 w-4" />
+              Transcripts ({transcripts.length})
+            </TabsTrigger>
+            <TabsTrigger value="reactions" className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white gap-2" data-testid="tab-reactions">
+              <Twitter className="h-4 w-4" />
+              X Reactions ({xReactions.length})
+            </TabsTrigger>
+            <TabsTrigger value="articles" className="data-[state=active]:bg-[#0176D3] data-[state=active]:text-white gap-2" data-testid="tab-articles">
+              <Newspaper className="h-4 w-4" />
+              Articles ({articles.length})
+            </TabsTrigger>
+          </TabsList>
+          
+          <div className="flex items-center gap-2">
+            {contentRefreshResult && (
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  "transition-opacity",
+                  contentRefreshResult.success 
+                    ? "text-green-700 border-green-300 bg-green-50" 
+                    : "text-red-700 border-red-300 bg-red-50"
+                )}
+              >
+                {contentRefreshResult.message}
+              </Badge>
+            )}
+            <Button
+              onClick={refreshContent}
+              disabled={isRefreshingContent}
+              variant="outline"
+              className="gap-2 border-purple-300 text-purple-700 hover:bg-purple-50"
+            >
+              <Zap className={cn("h-4 w-4", isRefreshingContent && "animate-pulse")} />
+              {isRefreshingContent ? "Fetching from AI..." : "Fetch Latest Content"}
+            </Button>
+          </div>
+        </div>
 
         <TabsContent value="earnings">
           {/* Live Refresh Bar */}

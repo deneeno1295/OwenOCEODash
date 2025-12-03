@@ -451,6 +451,31 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async upsertEarningsReport(report: InsertEarningsReport): Promise<EarningsReport> {
+    // Check if report exists for this company/quarter/fiscalYear
+    const existing = await db.select()
+      .from(schema.earningsReports)
+      .where(and(
+        eq(schema.earningsReports.companyName, report.companyName),
+        eq(schema.earningsReports.quarter, report.quarter),
+        eq(schema.earningsReports.fiscalYear, report.fiscalYear)
+      ))
+      .limit(1);
+    
+    if (existing.length > 0) {
+      // Update existing report
+      const result = await db.update(schema.earningsReports)
+        .set(report)
+        .where(eq(schema.earningsReports.id, existing[0].id))
+        .returning();
+      return result[0];
+    } else {
+      // Insert new report
+      const result = await db.insert(schema.earningsReports).values(report).returning();
+      return result[0];
+    }
+  }
+
   // Travel Locations
   async getTravelLocations(): Promise<TravelLocation[]> {
     return await db.select()

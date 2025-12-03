@@ -23,8 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
-import LiveEarningsWidget from "@/components/LiveEarningsWidget";
+import { useLocation } from "wouter";
 
 interface Competitor {
   id: number;
@@ -213,15 +212,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Live Salesforce Earnings Widget - Prominent at Top */}
-      <div className="max-w-4xl mx-auto">
-        <LiveEarningsWidget 
-          company="Salesforce" 
-          autoStart={true} 
-          pollIntervalMs={120000}
-        />
-      </div>
-
       {/* Single Column Layout */}
       <div className="space-y-6 max-w-4xl mx-auto">
         {/* Technology Earnings - Top */}
@@ -254,6 +244,9 @@ export default function Dashboard() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-semibold text-[#080707]">{report.companyName}</h3>
+                          {report.companyName.toLowerCase().includes("salesforce") && (
+                            <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 text-[10px] px-1.5 py-0.5 font-bold animate-pulse">NEW</Badge>
+                          )}
                           {getBeatMissBadge(report.beatMiss)}
                           {getGuidanceBadge(report.guidance)}
                         </div>

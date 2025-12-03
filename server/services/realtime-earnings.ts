@@ -5,6 +5,8 @@
 
 import { EventEmitter } from "events";
 import { searchMarketData, getEarningsData } from "./perplexity";
+import { storage } from "../storage";
+import type { InsertEarningsReport } from "@shared/schema";
 
 // Event emitter for SSE clients
 export const earningsEmitter = new EventEmitter();
@@ -305,9 +307,55 @@ export function getLastData(company: string): LiveEarningsData | null {
 }
 
 /**
+ * Save live earnings data to the database
+ */
+export async function saveEarningsToDb(data: LiveEarningsData): Promise<void> {
+  try {
+    // Only save if we have meaningful data
+    if (!data.revenue && !data.eps && data.status === "unknown") {
+      console.log(`[RealtimeEarnings] Skipping DB save - no meaningful data for ${data.company}`);
+      return;
+    }
+
+    // Determine beat/miss status
+    let beatMiss: string | undefined;
+    if (data.revenueBeatMiss === "beat" || data.epsBeatMiss === "beat") {
+      beatMiss = "beat";
+    } else if (data.revenueBeatMiss === "miss" || data.epsBeatMiss === "miss") {
+      beatMiss = "miss";
+    } else if (data.revenue || data.eps) {
+      beatMiss = "inline";
+    }
+
+    const report: InsertEarningsReport = {
+      companyName: data.company,
+      quarter: data.quarter,
+      fiscalYear: data.fiscalYear,
+      revenue: data.revenue || null,
+      revenueExpected: data.revenueExpected || null,
+      revenueBeatMiss: data.revenueBeatMiss || null,
+      eps: data.eps || null,
+      epsExpected: data.epsExpected || null,
+      epsBeatMiss: data.epsBeatMiss || null,
+      beatMiss: beatMiss || null,
+      beatMissDetails: data.summary?.slice(0, 200) || null,
+      guidance: data.guidance || null,
+      guidanceNotes: data.guidanceNotes || null,
+      stockReaction: data.stockReaction || null,
+      analystReaction: data.analystReaction || null,
+    };
+
+    await storage.upsertEarningsReport(report);
+    console.log(`[RealtimeEarnings] Saved earnings data to DB for ${data.company} ${data.quarter} ${data.fiscalYear}`);
+  } catch (error: any) {
+    console.error(`[RealtimeEarnings] Failed to save to DB:`, error.message);
+  }
+}
+
+/**
  * Manual refresh - fetch immediately regardless of interval
  */
-export async function manualRefresh(company: string): Promise<LiveEarningsData> {
+export async function manualRefresh(company: string, saveToDb: boolean = true): Promise<LiveEarningsData> {
   console.log(`[RealtimeEarnings] Manual refresh requested for ${company}`);
   
   const data = await fetchLiveEarnings(company);
@@ -316,6 +364,11 @@ export async function manualRefresh(company: string): Promise<LiveEarningsData> 
   const session = pollingSessions.get(company.toLowerCase());
   if (session) {
     session.lastData = data;
+  }
+  
+  // Save to database if requested and data is meaningful
+  if (saveToDb && data.status !== "unknown") {
+    await saveEarningsToDb(data);
   }
   
   // Emit update
@@ -332,6 +385,7 @@ export default {
   getPollingStatus,
   getLastData,
   manualRefresh,
+  saveEarningsToDb,
   earningsEmitter,
 };
 
