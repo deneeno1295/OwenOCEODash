@@ -292,6 +292,35 @@ export async function seedDatabase() {
         transcriptUrl: "https://salesforce.com/investor-relations/q3-2025-transcript",
         pressReleaseUrl: "https://salesforce.com/investor-relations/q3-2025-press"
       },
+      // Q4 FY2025 - LIVE TODAY - Placeholder for real-time updates
+      {
+        companyName: "Salesforce",
+        quarter: "Q4",
+        fiscalYear: "FY2025",
+        revenue: null,
+        revenueExpected: "$9.90B",
+        revenueBeatMiss: null,
+        revenueChange: null,
+        eps: null,
+        epsExpected: "$2.55",
+        epsBeatMiss: null,
+        epsChange: null,
+        beatMiss: null,
+        beatMissDetails: "Earnings reporting TODAY - Click to refresh for live updates",
+        guidance: null,
+        guidanceVsExpectations: null,
+        guidanceNotes: "Consensus expects continued momentum from Agentforce, Data Cloud growth, and AI initiatives. Watch for FY26 guidance.",
+        nextQuarterRevenue: null,
+        nextQuarterEps: null,
+        fullYearRevenue: null,
+        fullYearEps: null,
+        stockReaction: null,
+        stockReactionTime: null,
+        analystReaction: "expectations high",
+        priceTargetChanges: "Watching for updates",
+        transcriptUrl: null,
+        pressReleaseUrl: null
+      },
     ];
 
     for (const report of earningsReports) {

@@ -24,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
+import LiveEarningsWidget from "@/components/LiveEarningsWidget";
 
 interface Competitor {
   id: number;
@@ -210,6 +211,15 @@ export default function Dashboard() {
             Last updated: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
+      </div>
+
+      {/* Live Salesforce Earnings Widget - Prominent at Top */}
+      <div className="max-w-4xl mx-auto">
+        <LiveEarningsWidget 
+          company="Salesforce" 
+          autoStart={true} 
+          pollIntervalMs={120000}
+        />
       </div>
 
       {/* Single Column Layout */}

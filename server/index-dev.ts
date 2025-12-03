@@ -68,6 +68,15 @@ export async function setupVite(app: Express, server: Server) {
   } catch (error) {
     console.error("Failed to seed database:", error);
   }
+
+  // Start the agent scheduler for automated jobs
+  try {
+    const { startScheduler } = await import("./agents/scheduler");
+    await startScheduler();
+    console.log("[Startup] Agent scheduler started");
+  } catch (error) {
+    console.error("[Startup] Failed to start agent scheduler:", error);
+  }
   
   await runApp(setupVite);
 })();

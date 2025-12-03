@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,10 +21,13 @@ import {
   Twitter,
   ThumbsUp,
   ThumbsDown,
-  Sparkles
+  Sparkles,
+  RefreshCw,
+  Radio,
+  Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 
 interface Competitor {
@@ -97,6 +101,10 @@ interface CompetitorDetailProps {
 }
 
 export default function CompetitorDetail({ id }: CompetitorDetailProps) {
+  const [isRefreshingLive, setIsRefreshingLive] = useState(false);
+  const [liveData, setLiveData] = useState<any>(null);
+  const queryClient = useQueryClient();
+
   const { data: competitor, isLoading, error } = useQuery<Competitor>({
     queryKey: ["competitor", id],
     queryFn: async () => {
@@ -116,6 +124,29 @@ export default function CompetitorDetail({ id }: CompetitorDetailProps) {
     },
     enabled: !!competitor?.name,
   });
+
+  // Refresh live earnings data
+  const refreshLiveEarnings = async () => {
+    if (!competitor?.name) return;
+    setIsRefreshingLive(true);
+    try {
+      const res = await fetch("/api/earnings/live/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company: competitor.name }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLiveData(data);
+        // Also refetch the static earnings data
+        queryClient.invalidateQueries({ queryKey: ["earnings", competitor.name] });
+      }
+    } catch (err) {
+      console.error("Failed to refresh live data:", err);
+    } finally {
+      setIsRefreshingLive(false);
+    }
+  };
 
   const { data: sentiment } = useQuery<SentimentAnalysis>({
     queryKey: ["sentiment", id],
@@ -273,6 +304,51 @@ export default function CompetitorDetail({ id }: CompetitorDetailProps) {
         </TabsList>
 
         <TabsContent value="earnings">
+          {/* Live Refresh Bar */}
+          <Card className="mb-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+            <CardContent className="py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Radio className={cn("h-5 w-5", isRefreshingLive ? "text-blue-600 animate-pulse" : "text-blue-500")} />
+                  <div>
+                    <p className="font-medium text-blue-900">Live Earnings Updates</p>
+                    <p className="text-xs text-blue-700">Click refresh to fetch real-time data from market sources</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {liveData && (
+                    <Badge variant="outline" className="text-green-700 border-green-300">
+                      Updated: {new Date(liveData.lastUpdated).toLocaleTimeString()}
+                    </Badge>
+                  )}
+                  <Button 
+                    onClick={refreshLiveEarnings}
+                    disabled={isRefreshingLive}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshingLive && "animate-spin")} />
+                    {isRefreshingLive ? "Fetching..." : "Refresh Live Data"}
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Live Data Summary */}
+              {liveData && liveData.summary && (
+                <div className="mt-3 p-3 bg-white/50 rounded-lg border border-blue-100">
+                  <p className="text-sm font-medium text-blue-900 mb-1">Latest from AI Research:</p>
+                  <p className="text-sm text-blue-800 line-clamp-3">{liveData.summary}</p>
+                  {liveData.revenue && (
+                    <div className="mt-2 flex items-center gap-4 text-sm">
+                      <span className="font-medium">Revenue: {liveData.revenue}</span>
+                      <span className="font-medium">EPS: {liveData.eps || "—"}</span>
+                      {liveData.guidance && <Badge className="bg-green-100 text-green-700">{liveData.guidance}</Badge>}
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {latestEarnings ? (
             <div className="grid gap-6 md:grid-cols-3">
               <div className="md:col-span-2 space-y-6">
@@ -283,7 +359,7 @@ export default function CompetitorDetail({ id }: CompetitorDetailProps) {
                         {latestEarnings.quarter} {latestEarnings.fiscalYear} Results
                       </CardTitle>
                       <Badge className={cn("border-0", getBeatMissColor(latestEarnings.beatMiss))}>
-                        {latestEarnings.beatMissDetails || (latestEarnings.beatMiss === "beat" ? "Beat Estimates" : "Missed Estimates")}
+                        {latestEarnings.beatMissDetails || (latestEarnings.beatMiss === "beat" ? "Beat Estimates" : latestEarnings.beatMiss === "miss" ? "Missed Estimates" : "Awaiting Results")}
                       </Badge>
                     </div>
                   </CardHeader>

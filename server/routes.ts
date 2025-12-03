@@ -1610,6 +1610,185 @@ Provide at least 10-15 high-quality, relevant contacts.`;
     }
   });
 
+  // ==========================================
+  // Real-time Earnings Routes (SSE)
+  // ==========================================
+  
+  const getRealtimeEarnings = async () => {
+    const { 
+      earningsEmitter, 
+      startPolling, 
+      stopPolling, 
+      getPollingStatus, 
+      getLastData,
+      manualRefresh,
+      fetchLiveEarnings
+    } = await import("./services/realtime-earnings");
+    return { earningsEmitter, startPolling, stopPolling, getPollingStatus, getLastData, manualRefresh, fetchLiveEarnings };
+  };
+
+  // SSE endpoint for real-time earnings updates
+  app.get("/api/earnings/live/stream", async (req, res) => {
+    try {
+      const { earningsEmitter } = await getRealtimeEarnings();
+      
+      // Set SSE headers
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering
+      res.flushHeaders();
+      
+      // Send initial connection message
+      res.write(`event: connected\ndata: ${JSON.stringify({ connected: true, timestamp: new Date() })}\n\n`);
+      
+      // Handler for updates
+      const onUpdate = (data: any) => {
+        res.write(`event: update\ndata: ${JSON.stringify(data)}\n\n`);
+      };
+      
+      // Handler for changes
+      const onChange = (data: any) => {
+        res.write(`event: change\ndata: ${JSON.stringify(data)}\n\n`);
+      };
+      
+      // Handler for errors
+      const onError = (data: any) => {
+        res.write(`event: error\ndata: ${JSON.stringify(data)}\n\n`);
+      };
+      
+      // Handler for polling status changes
+      const onPollingStarted = (data: any) => {
+        res.write(`event: polling_started\ndata: ${JSON.stringify(data)}\n\n`);
+      };
+      
+      const onPollingStopped = (data: any) => {
+        res.write(`event: polling_stopped\ndata: ${JSON.stringify(data)}\n\n`);
+      };
+      
+      // Subscribe to events
+      earningsEmitter.on("update", onUpdate);
+      earningsEmitter.on("change", onChange);
+      earningsEmitter.on("error", onError);
+      earningsEmitter.on("polling_started", onPollingStarted);
+      earningsEmitter.on("polling_stopped", onPollingStopped);
+      
+      // Heartbeat to keep connection alive
+      const heartbeat = setInterval(() => {
+        res.write(`event: heartbeat\ndata: ${JSON.stringify({ timestamp: new Date() })}\n\n`);
+      }, 30000);
+      
+      // Cleanup on close
+      req.on("close", () => {
+        clearInterval(heartbeat);
+        earningsEmitter.off("update", onUpdate);
+        earningsEmitter.off("change", onChange);
+        earningsEmitter.off("error", onError);
+        earningsEmitter.off("polling_started", onPollingStarted);
+        earningsEmitter.off("polling_stopped", onPollingStopped);
+      });
+      
+    } catch (error) {
+      console.error("SSE stream error:", error);
+      res.status(500).json({ error: "Failed to establish stream" });
+    }
+  });
+
+  // Start polling for a company
+  app.post("/api/earnings/live/start", async (req, res) => {
+    try {
+      const schema = z.object({
+        company: z.string().min(1),
+        intervalMs: z.number().optional().default(120000), // 2 minutes default
+      });
+      const { company, intervalMs } = schema.parse(req.body);
+      
+      const { startPolling, getPollingStatus } = await getRealtimeEarnings();
+      startPolling(company, intervalMs);
+      
+      res.json({ 
+        success: true, 
+        message: `Started polling for ${company} every ${intervalMs / 1000} seconds`,
+        status: getPollingStatus()
+      });
+    } catch (error: any) {
+      console.error("Start polling error:", error);
+      res.status(500).json({ error: error.message || "Failed to start polling" });
+    }
+  });
+
+  // Stop polling for a company
+  app.post("/api/earnings/live/stop", async (req, res) => {
+    try {
+      const schema = z.object({
+        company: z.string().min(1),
+      });
+      const { company } = schema.parse(req.body);
+      
+      const { stopPolling, getPollingStatus } = await getRealtimeEarnings();
+      stopPolling(company);
+      
+      res.json({ 
+        success: true, 
+        message: `Stopped polling for ${company}`,
+        status: getPollingStatus()
+      });
+    } catch (error: any) {
+      console.error("Stop polling error:", error);
+      res.status(500).json({ error: error.message || "Failed to stop polling" });
+    }
+  });
+
+  // Manual refresh
+  app.post("/api/earnings/live/refresh", async (req, res) => {
+    try {
+      const schema = z.object({
+        company: z.string().min(1),
+      });
+      const { company } = schema.parse(req.body);
+      
+      const { manualRefresh } = await getRealtimeEarnings();
+      const data = await manualRefresh(company);
+      
+      res.json(data);
+    } catch (error: any) {
+      console.error("Manual refresh error:", error);
+      res.status(500).json({ error: error.message || "Failed to refresh" });
+    }
+  });
+
+  // Get polling status
+  app.get("/api/earnings/live/status", async (req, res) => {
+    try {
+      const { getPollingStatus, getLastData } = await getRealtimeEarnings();
+      const status = getPollingStatus();
+      
+      // Include last data for each active session
+      const sessionsWithData = status.activeSessions.map(session => ({
+        ...session,
+        lastData: getLastData(session.company),
+      }));
+      
+      res.json({ activeSessions: sessionsWithData });
+    } catch (error: any) {
+      console.error("Polling status error:", error);
+      res.status(500).json({ error: error.message || "Failed to get status" });
+    }
+  });
+
+  // One-time fetch without starting polling
+  app.get("/api/earnings/live/fetch/:company", async (req, res) => {
+    try {
+      const company = req.params.company;
+      const { fetchLiveEarnings } = await getRealtimeEarnings();
+      const data = await fetchLiveEarnings(company);
+      res.json(data);
+    } catch (error: any) {
+      console.error("Fetch earnings error:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch earnings" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
