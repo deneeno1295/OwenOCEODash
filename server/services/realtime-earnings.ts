@@ -23,9 +23,11 @@ export interface LiveEarningsData {
   revenue?: string;
   revenueExpected?: string;
   revenueBeatMiss?: string;
+  revenueYoY?: string;
   eps?: string;
   epsExpected?: string;
   epsBeatMiss?: string;
+  epsYoY?: string;
   
   // Guidance
   guidance?: string;
@@ -80,8 +82,8 @@ export async function fetchLiveEarnings(company: string): Promise<LiveEarningsDa
     // Parse the response to extract key metrics
     const data: LiveEarningsData = {
       company,
-      quarter: earningsData?.revenue ? extractQuarter(marketData) : "Q3",
-      fiscalYear: "FY2025",
+      quarter: extractQuarter(marketData),
+      fiscalYear: extractFiscalYear(marketData, company),
       status: determineEarningsStatus(marketData),
       lastUpdated: now,
       summary: marketData,
@@ -93,11 +95,20 @@ export async function fetchLiveEarnings(company: string): Promise<LiveEarningsDa
       data.revenue = earningsData.revenue;
       data.revenueExpected = earningsData.revenueExpected;
       data.revenueBeatMiss = earningsData.revenueBeatMiss;
+      data.revenueYoY = earningsData.revenueYoY;
       data.eps = earningsData.eps;
       data.epsExpected = earningsData.epsExpected;
       data.epsBeatMiss = earningsData.epsBeatMiss;
+      data.epsYoY = earningsData.epsYoY;
       data.guidance = earningsData.guidance;
       data.guidanceNotes = earningsData.keyHighlights?.join("; ");
+      // Use fiscal year from structured data if available
+      if (earningsData.fiscalYear && earningsData.fiscalYear !== "N/A") {
+        data.fiscalYear = earningsData.fiscalYear;
+      }
+      if (earningsData.fiscalQuarter && earningsData.fiscalQuarter !== "N/A") {
+        data.quarter = earningsData.fiscalQuarter;
+      }
     } else {
       // Try to extract from summary
       const extracted = extractMetricsFromSummary(marketData);
@@ -113,7 +124,7 @@ export async function fetchLiveEarnings(company: string): Promise<LiveEarningsDa
     return {
       company,
       quarter: "Q3",
-      fiscalYear: "FY2025",
+      fiscalYear: extractFiscalYear("", company),
       status: "unknown",
       lastUpdated: now,
       summary: `Unable to fetch live data: ${error.message}`,
@@ -127,6 +138,49 @@ export async function fetchLiveEarnings(company: string): Promise<LiveEarningsDa
 function extractQuarter(text: string): string {
   const quarterMatch = text.match(/Q[1-4]/i);
   return quarterMatch ? quarterMatch[0].toUpperCase() : "Q3";
+}
+
+/**
+ * Extract fiscal year from text
+ * Handles various formats: FY2026, fiscal 2026, fiscal year 2026, FY26
+ */
+function extractFiscalYear(text: string, company: string): string {
+  // Look for explicit fiscal year mentions
+  const fyMatch = text.match(/(?:FY|fiscal\s*(?:year)?\s*)['"]?(\d{2,4})/i);
+  
+  if (fyMatch) {
+    let year = fyMatch[1];
+    // Handle 2-digit years (e.g., FY26 -> FY2026)
+    if (year.length === 2) {
+      year = "20" + year;
+    }
+    return `FY${year}`;
+  }
+  
+  // Fallback: For companies like Salesforce with Feb fiscal year end,
+  // the current calendar year Q4 (Oct-Dec) is their next FY's Q3
+  // Example: October 2024 = Salesforce Q3 FY2025, but December 2024 reporting would be Q3 FY2026
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // 1-12
+  
+  // Salesforce and similar companies: FY starts in February
+  // So if we're in Nov/Dec 2024, that's Q3/Q4 of FY2025
+  // If we're in Jan 2025, that's Q4 of FY2025
+  // Feb 2025 starts FY2026
+  const salesforceCompanies = ["salesforce", "crm"];
+  const isSalesforceLikeFY = salesforceCompanies.some(c => company.toLowerCase().includes(c));
+  
+  if (isSalesforceLikeFY) {
+    // Salesforce FY = calendar year + 1 for most of the year
+    // Feb-Dec of year X = FY(X+1)
+    // Jan of year X = FY(X)
+    const fiscalYear = currentMonth >= 2 ? currentYear + 1 : currentYear;
+    return `FY${fiscalYear}`;
+  }
+  
+  // Default: Most companies use calendar year = fiscal year
+  return `FY${currentYear}`;
 }
 
 /**
@@ -334,9 +388,11 @@ export async function saveEarningsToDb(data: LiveEarningsData): Promise<void> {
       revenue: data.revenue || null,
       revenueExpected: data.revenueExpected || null,
       revenueBeatMiss: data.revenueBeatMiss || null,
+      revenueChange: data.revenueYoY || null,
       eps: data.eps || null,
       epsExpected: data.epsExpected || null,
       epsBeatMiss: data.epsBeatMiss || null,
+      epsChange: data.epsYoY || null,
       beatMiss: beatMiss || null,
       beatMissDetails: data.summary?.slice(0, 200) || null,
       guidance: data.guidance || null,

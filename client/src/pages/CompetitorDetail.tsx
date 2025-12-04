@@ -414,69 +414,128 @@ export default function CompetitorDetail({ id }: CompetitorDetailProps) {
           {latestEarnings ? (
             <div className="grid gap-6 md:grid-cols-3">
               <div className="md:col-span-2 space-y-6">
-                <Card className="bg-white shadow-sm">
-                  <CardHeader className="border-b border-gray-100">
+                {/* Overall Result Summary Card */}
+                <Card className={cn(
+                  "shadow-sm border-l-4",
+                  latestEarnings.guidance === "raised" ? "border-l-green-500 bg-gradient-to-r from-green-50 to-white" :
+                  latestEarnings.guidance === "lowered" ? "border-l-red-500 bg-gradient-to-r from-red-50 to-white" :
+                  "border-l-blue-500 bg-gradient-to-r from-blue-50 to-white"
+                )}>
+                  <CardContent className="py-4">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-base font-semibold text-[#080707]">
-                        {latestEarnings.quarter} {latestEarnings.fiscalYear} Results
-                      </CardTitle>
-                      <Badge className={cn("border-0", getBeatMissColor(latestEarnings.beatMiss))}>
-                        {latestEarnings.beatMissDetails || (latestEarnings.beatMiss === "beat" ? "Beat Estimates" : latestEarnings.beatMiss === "miss" ? "Missed Estimates" : "Awaiting Results")}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-4">
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-medium text-[#080707]">Revenue</h4>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-3xl font-light text-[#080707]">{latestEarnings.revenue || "N/A"}</span>
-                          {latestEarnings.revenueBeatMiss && (
-                            <Badge className={cn("text-xs", 
-                              latestEarnings.revenueBeatMiss.startsWith("+") ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                            )}>
-                              {latestEarnings.revenueBeatMiss}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Expected: {latestEarnings.revenueExpected || "N/A"}
-                        </div>
-                        {latestEarnings.revenueChange && (
-                          <div className="text-sm text-muted-foreground">
-                            YoY Change: <span className={latestEarnings.revenueChange.startsWith("+") ? "text-green-600" : "text-red-600"}>
-                              {latestEarnings.revenueChange}
-                            </span>
-                          </div>
-                        )}
+                      <div>
+                        <h3 className="text-lg font-semibold text-[#080707]">
+                          {latestEarnings.quarter} {latestEarnings.fiscalYear} Results
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {latestEarnings.beatMissDetails || "Quarterly earnings report"}
+                        </p>
                       </div>
-                      
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-medium text-[#080707]">EPS</h4>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-3xl font-light text-[#080707]">{latestEarnings.eps || "N/A"}</span>
-                          {latestEarnings.epsBeatMiss && (
-                            <Badge className={cn("text-xs", 
-                              latestEarnings.epsBeatMiss.startsWith("+") ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                            )}>
-                              {latestEarnings.epsBeatMiss}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Expected: {latestEarnings.epsExpected || "N/A"}
-                        </div>
-                        {latestEarnings.epsChange && (
-                          <div className="text-sm text-muted-foreground">
-                            YoY Change: <span className={latestEarnings.epsChange.startsWith("+") ? "text-green-600" : "text-red-600"}>
-                              {latestEarnings.epsChange}
-                            </span>
-                          </div>
+                      <div className="flex items-center gap-2">
+                        {latestEarnings.guidance && (
+                          <Badge className={cn("border-0 text-sm px-3 py-1",
+                            latestEarnings.guidance === "raised" ? "bg-green-100 text-green-700" :
+                            latestEarnings.guidance === "lowered" ? "bg-red-100 text-red-700" :
+                            "bg-yellow-100 text-yellow-700"
+                          )}>
+                            {latestEarnings.guidance === "raised" ? "↑ Guidance Raised" : 
+                             latestEarnings.guidance === "lowered" ? "↓ Guidance Lowered" : 
+                             "→ Guidance Maintained"}
+                          </Badge>
                         )}
                       </div>
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Revenue & EPS Cards - Redesigned */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Revenue Card */}
+                  <Card className="bg-white shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Revenue</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Primary: Actual Value with YoY Growth */}
+                      <div>
+                        <div className="flex items-baseline gap-3">
+                          <span className="text-3xl font-semibold text-[#080707]">{latestEarnings.revenue || "N/A"}</span>
+                          {latestEarnings.revenueChange && (
+                            <Badge className={cn("text-sm font-medium",
+                              latestEarnings.revenueChange.startsWith("+") || latestEarnings.revenueChange.startsWith("-") === false
+                                ? "bg-green-100 text-green-700 border-green-200" 
+                                : "bg-red-100 text-red-700 border-red-200"
+                            )}>
+                              {latestEarnings.revenueChange.startsWith("+") || latestEarnings.revenueChange.startsWith("-") 
+                                ? latestEarnings.revenueChange 
+                                : `+${latestEarnings.revenueChange}`} YoY
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Secondary: vs Analyst Estimates */}
+                      <div className="pt-3 border-t border-gray-100">
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">vs Analyst Estimates</div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">
+                            Est: {latestEarnings.revenueExpected || "N/A"}
+                          </span>
+                          {latestEarnings.revenueBeatMiss && (
+                            <span className={cn("text-sm font-medium",
+                              latestEarnings.revenueBeatMiss.startsWith("+") ? "text-green-600" : "text-red-600"
+                            )}>
+                              {latestEarnings.revenueBeatMiss.startsWith("+") ? "Beat" : "Missed"} ({latestEarnings.revenueBeatMiss})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* EPS Card */}
+                  <Card className="bg-white shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Earnings Per Share</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Primary: Actual Value with YoY Growth */}
+                      <div>
+                        <div className="flex items-baseline gap-3">
+                          <span className="text-3xl font-semibold text-[#080707]">{latestEarnings.eps || "N/A"}</span>
+                          {latestEarnings.epsChange && (
+                            <Badge className={cn("text-sm font-medium",
+                              latestEarnings.epsChange.startsWith("+") || latestEarnings.epsChange.startsWith("-") === false
+                                ? "bg-green-100 text-green-700 border-green-200" 
+                                : "bg-red-100 text-red-700 border-red-200"
+                            )}>
+                              {latestEarnings.epsChange.startsWith("+") || latestEarnings.epsChange.startsWith("-") 
+                                ? latestEarnings.epsChange 
+                                : `+${latestEarnings.epsChange}`} YoY
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Secondary: vs Analyst Estimates */}
+                      <div className="pt-3 border-t border-gray-100">
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">vs Analyst Estimates</div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">
+                            Est: {latestEarnings.epsExpected || "N/A"}
+                          </span>
+                          {latestEarnings.epsBeatMiss && (
+                            <span className={cn("text-sm font-medium",
+                              latestEarnings.epsBeatMiss.startsWith("+") ? "text-green-600" : "text-red-600"
+                            )}>
+                              {latestEarnings.epsBeatMiss.startsWith("+") ? "Beat" : "Missed"} ({latestEarnings.epsBeatMiss})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
 
                 <Card className="bg-white shadow-sm">
                   <CardHeader className="border-b border-gray-100">

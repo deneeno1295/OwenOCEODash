@@ -82,24 +82,36 @@ export async function getEarningsData(
   revenue: string;
   revenueExpected: string;
   revenueBeatMiss: string;
+  revenueYoY: string;
   eps: string;
   epsExpected: string;
   epsBeatMiss: string;
+  epsYoY: string;
+  fiscalYear: string;
+  fiscalQuarter: string;
   guidance: string;
   keyHighlights: string[];
 }> {
   const quarterStr = quarter || "most recent quarter";
   const systemPrompt = `You are a financial analyst specializing in earnings reports.
-Provide structured earnings data with actual vs expected figures.
-Always include specific numbers and percentage changes.`;
+Provide structured earnings data with ACTUAL vs EXPECTED figures and YEAR-OVER-YEAR growth.
+Be precise with numbers. Use format like "$10.3B" for revenue and "$2.19" for EPS.
+For beat/miss, calculate: ((actual - expected) / expected * 100) and format as "+X.X%" or "-X.X%".
+For YoY growth, format as "+X%" or "-X%".`;
 
   const userPrompt = `Get the ${quarterStr} earnings data for ${company}. Include:
-- Revenue (actual, expected, beat/miss percentage)
-- EPS (actual, expected, beat/miss percentage)
+- Fiscal quarter (e.g., "Q3") and fiscal year (e.g., "FY2026")
+- Revenue: actual value, analyst expected value, beat/miss percentage vs estimate, year-over-year growth %
+- EPS: actual value, analyst expected value, beat/miss percentage vs estimate, year-over-year growth %
 - Forward guidance (raised/maintained/lowered)
 - Key highlights from the earnings call
 
-Respond in JSON format with keys: revenue, revenueExpected, revenueBeatMiss, eps, epsExpected, epsBeatMiss, guidance, keyHighlights`;
+IMPORTANT: 
+- Beat/miss is (actual - expected) / expected * 100
+- If actual < expected, it's a MISS with negative percentage
+- YoY growth is compared to same quarter last year
+
+Respond in JSON format with keys: fiscalQuarter, fiscalYear, revenue, revenueExpected, revenueBeatMiss, revenueYoY, eps, epsExpected, epsBeatMiss, epsYoY, guidance, keyHighlights`;
 
   const response = await callPerplexity(systemPrompt, userPrompt);
   
@@ -107,7 +119,9 @@ Respond in JSON format with keys: revenue, revenueExpected, revenueBeatMiss, eps
     // Try to parse JSON from response
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      const data = JSON.parse(jsonMatch[0]);
+      // Validate and recalculate beat/miss if needed
+      return validateEarningsData(data);
     }
   } catch (e) {
     // If parsing fails, return structured default
@@ -117,12 +131,77 @@ Respond in JSON format with keys: revenue, revenueExpected, revenueBeatMiss, eps
     revenue: "N/A",
     revenueExpected: "N/A",
     revenueBeatMiss: "N/A",
+    revenueYoY: "N/A",
     eps: "N/A",
     epsExpected: "N/A",
     epsBeatMiss: "N/A",
+    epsYoY: "N/A",
+    fiscalYear: "N/A",
+    fiscalQuarter: "N/A",
     guidance: "N/A",
     keyHighlights: [response],
   };
+}
+
+/**
+ * Validate and recalculate beat/miss percentages if they seem incorrect
+ */
+function validateEarningsData(data: any): any {
+  // Helper to parse numeric values from strings like "$10.3B" or "$2.19"
+  const parseValue = (str: string): number | null => {
+    if (!str || str === "N/A") return null;
+    const match = str.match(/[\d.]+/);
+    if (!match) return null;
+    let value = parseFloat(match[0]);
+    // Handle B/M suffixes
+    if (str.toUpperCase().includes("B")) value *= 1;
+    else if (str.toUpperCase().includes("M")) value *= 0.001;
+    return value;
+  };
+
+  // Helper to calculate beat/miss percentage
+  const calculateBeatMiss = (actual: number | null, expected: number | null): string | null => {
+    if (actual === null || expected === null || expected === 0) return null;
+    const pct = ((actual - expected) / expected) * 100;
+    const sign = pct >= 0 ? "+" : "";
+    return `${sign}${pct.toFixed(2)}%`;
+  };
+
+  // Validate revenue beat/miss
+  const revenueActual = parseValue(data.revenue);
+  const revenueExpected = parseValue(data.revenueExpected);
+  if (revenueActual !== null && revenueExpected !== null) {
+    const calculatedBeatMiss = calculateBeatMiss(revenueActual, revenueExpected);
+    // If the provided beat/miss seems way off, recalculate
+    if (calculatedBeatMiss && data.revenueBeatMiss) {
+      const providedPct = parseFloat(data.revenueBeatMiss);
+      const calculatedPct = parseFloat(calculatedBeatMiss);
+      if (Math.abs(providedPct - calculatedPct) > 5) {
+        // Use recalculated value
+        data.revenueBeatMiss = calculatedBeatMiss;
+      }
+    } else if (calculatedBeatMiss && !data.revenueBeatMiss) {
+      data.revenueBeatMiss = calculatedBeatMiss;
+    }
+  }
+
+  // Validate EPS beat/miss
+  const epsActual = parseValue(data.eps);
+  const epsExpected = parseValue(data.epsExpected);
+  if (epsActual !== null && epsExpected !== null) {
+    const calculatedBeatMiss = calculateBeatMiss(epsActual, epsExpected);
+    if (calculatedBeatMiss && data.epsBeatMiss) {
+      const providedPct = parseFloat(data.epsBeatMiss);
+      const calculatedPct = parseFloat(calculatedBeatMiss);
+      if (Math.abs(providedPct - calculatedPct) > 5) {
+        data.epsBeatMiss = calculatedBeatMiss;
+      }
+    } else if (calculatedBeatMiss && !data.epsBeatMiss) {
+      data.epsBeatMiss = calculatedBeatMiss;
+    }
+  }
+
+  return data;
 }
 
 /**
@@ -181,13 +260,15 @@ export async function getAnalystReports(
     priceTarget: string;
     date: string;
     summary: string;
+    url: string | null;
   }[];
   consensusRating: string;
   averagePriceTarget: string;
 }> {
   const systemPrompt = `You are a financial analyst tracking Wall Street coverage and ratings.
 Provide accurate, recent analyst reports with specific price targets and ratings.
-Focus on reports from the past 30 days.`;
+Focus on reports from the past 30 days.
+When possible, include URLs to the source articles or news coverage of the analyst reports.`;
 
   const userPrompt = `Get the most recent analyst reports and ratings for ${company}. Include:
 - Analyst name and firm
@@ -195,10 +276,11 @@ Focus on reports from the past 30 days.`;
 - Price target
 - Date of the report
 - Brief summary of the analyst's key points
+- URL to the news article or report coverage (if available, otherwise null)
 
 Also provide the consensus rating and average price target.
 
-Respond in JSON format with keys: reports (array with analyst, firm, rating, priceTarget, date, summary), consensusRating, averagePriceTarget`;
+Respond in JSON format with keys: reports (array with analyst, firm, rating, priceTarget, date, summary, url), consensusRating, averagePriceTarget`;
 
   const response = await callPerplexity(systemPrompt, userPrompt);
   

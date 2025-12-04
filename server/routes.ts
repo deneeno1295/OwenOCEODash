@@ -138,20 +138,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process analyst reports (Perplexity)
       if (results[0].status === "fulfilled" && results[0].value.reports.length > 0) {
         for (const report of results[0].value.reports) {
+          const summaryText = `${report.analyst} | Price Target: ${report.priceTarget} | ${report.date}`;
           const content = await storage.createCompetitorContent({
             competitorId,
             contentType: "analyst_report",
             title: `${report.firm}: ${report.rating}`,
+            summary: summaryText,
             content: report.summary,
             source: report.firm,
-            sourceUrl: null,
-            metadata: JSON.stringify({
-              analyst: report.analyst,
-              priceTarget: report.priceTarget,
-              date: report.date,
-              consensusRating: results[0].value.consensusRating,
-              averagePriceTarget: results[0].value.averagePriceTarget,
-            }),
+            url: report.url || null,
+            sentiment: report.rating?.toLowerCase().includes("buy") ? "positive" : 
+                       report.rating?.toLowerCase().includes("sell") ? "negative" : "neutral",
           });
           savedContent.push(content);
         }
@@ -161,19 +158,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process transcripts (Gemini)
       if (results[1].status === "fulfilled" && results[1].value.executiveSummary) {
         const transcript = results[1].value;
+        // Build rich content from transcript data
+        let fullContent = transcript.executiveSummary + "\n\n";
+        if (transcript.guidanceDetails) {
+          fullContent += `**Guidance:** ${transcript.guidanceDetails}\n\n`;
+        }
+        if (transcript.keyQuotes && transcript.keyQuotes.length > 0) {
+          fullContent += "**Key Quotes:**\n";
+          transcript.keyQuotes.forEach((q: any) => {
+            fullContent += `- "${q.quote}" — ${q.speaker} (${q.role})\n`;
+          });
+        }
         const content = await storage.createCompetitorContent({
           competitorId,
           contentType: "transcript",
           title: `Earnings Call Summary - ${companyName}`,
-          content: transcript.executiveSummary,
+          summary: transcript.executiveSummary,
+          content: fullContent,
           source: "Earnings Call",
-          sourceUrl: null,
-          metadata: JSON.stringify({
-            keyQuotes: transcript.keyQuotes,
-            guidanceDetails: transcript.guidanceDetails,
-            analystQA: transcript.analystQA,
-            sentiment: transcript.sentiment,
-          }),
+          url: null,
+          sentiment: transcript.sentiment || "neutral",
         });
         savedContent.push(content);
         console.log(`[ContentRefresh] Saved transcript summary`);
@@ -186,17 +190,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             competitorId,
             contentType: "x_reaction",
             title: `@${tweet.handle}`,
+            summary: `${tweet.author} ${tweet.isVerified ? '✓' : ''} | ${tweet.engagement} engagement`,
             content: tweet.content,
-            source: "X/Twitter",
-            sourceUrl: `https://twitter.com/${tweet.handle}`,
-            metadata: JSON.stringify({
-              author: tweet.author,
-              engagement: tweet.engagement,
-              sentiment: tweet.sentiment,
-              isVerified: tweet.isVerified,
-              overallSentiment: results[2].value.overallSentiment,
-              trendingTopics: results[2].value.trendingTopics,
-            }),
+            source: tweet.author,
+            url: `https://twitter.com/${tweet.handle}`,
+            sentiment: tweet.sentiment || "neutral",
           });
           savedContent.push(content);
         }
@@ -206,21 +204,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process articles (OpenAI)
       if (results[3].status === "fulfilled" && results[3].value.articles.length > 0) {
         for (const article of results[3].value.articles.slice(0, 5)) { // Limit to 5 articles
+          const keyPointsText = article.keyPoints?.join("; ") || "";
           const content = await storage.createCompetitorContent({
             competitorId,
             contentType: "article",
             title: article.title,
-            content: article.summary,
+            summary: article.summary,
+            content: keyPointsText ? `${article.summary}\n\nKey Points: ${keyPointsText}` : article.summary,
             source: article.source,
-            sourceUrl: null,
-            metadata: JSON.stringify({
-              date: article.date,
-              keyPoints: article.keyPoints,
-              sentiment: article.sentiment,
-              relevance: article.relevance,
-              themes: results[3].value.themes,
-              overallNarrative: results[3].value.overallNarrative,
-            }),
+            url: null,
+            sentiment: article.sentiment || "neutral",
           });
           savedContent.push(content);
         }
